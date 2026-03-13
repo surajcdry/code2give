@@ -14,10 +14,29 @@ const CircleMarker = dynamic(() => import('react-leaflet').then(mod => mod.Circl
 // Types
 type Pantry = { id: string; name: string; latitude: number; longitude: number; hours: string; description: string };
 
-export default function ImpactMap() {
-  const [layer, setLayer] = useState<"pantry" | "poverty">("pantry");
-  const [pantries, setPantries] = useState<Pantry[]>([]);
+interface ImpactMapProps {
+  title?: string;
+  subtitle?: string;
+  initialLayer?: "pantry" | "poverty";
+  pantries?: Pantry[];
+}
+
+export default function ImpactMap({
+  title = "NYC Impact Layer",
+  subtitle = "Live data from Lemontree InsightEngine",
+  initialLayer = "pantry",
+  pantries: initialPantries,
+}: ImpactMapProps) {
+  const [layer, setLayer] = useState<"pantry" | "poverty">(initialLayer);
+  const [pantries, setPantries] = useState<Pantry[]>(initialPantries ?? []);
   const [mounted, setMounted] = useState(false);
+
+  // Update map data if the parent provides new values
+  useEffect(() => {
+    if (initialPantries) {
+      setPantries(initialPantries);
+    }
+  }, [initialPantries]);
 
   // NYC center
   const position: [number, number] = [40.730610, -73.935242];
@@ -36,22 +55,24 @@ export default function ImpactMap() {
       });
     })();
 
-    // Fetch live map data from API
-    fetch('/api/map-data')
-      .then(res => res.json())
-      .then(data => {
-        if (data.pantries) setPantries(data.pantries);
-      })
-      .catch(err => console.error("Map Data Error:", err));
-  }, []);
+    // If data was not provided by the parent, load it ourselves.
+    if (!initialPantries) {
+      fetch('/api/map-data')
+        .then(res => res.json())
+        .then(data => {
+          if (data.pantries) setPantries(data.pantries);
+        })
+        .catch(err => console.error("Map Data Error:", err));
+    }
+  }, [initialPantries]);
 
   return (
     <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm flex flex-col h-[500px]">
       {/* Map Control Header */}
       <div className="bg-white p-4 border-b border-slate-100 flex items-center justify-between z-10 relative">
         <div>
-          <h3 className="font-semibold text-slate-900">NYC Impact Layer</h3>
-          <p className="text-sm text-slate-500">Live data from Lemontree InsightEngine</p>
+          <h3 className="font-semibold text-slate-900">{title}</h3>
+          <p className="text-sm text-slate-500">{subtitle}</p>
         </div>
 
         <div className="flex bg-slate-100 p-1 rounded-lg">
