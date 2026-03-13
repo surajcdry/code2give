@@ -11,7 +11,7 @@ async function main() {
   console.log('Seeding Database for Lemontree InsightEngine V1 via raw pg driver...');
 
   const client = new Client({
-    connectionString: process.env.DIRECT_DATABASE_URL,
+    connectionString: process.env.DATABASE_URL,
   });
 
   try {
