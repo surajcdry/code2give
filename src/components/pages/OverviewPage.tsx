@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useApp } from "@/components/layout/AppLayout";
 import { KPICard } from "@/components/dashboard/KPICard";
+import ImpactMap from "@/components/dashboard/ImpactMap";
+import { ReportCard, FeedbackReport } from "@/components/dashboard/ReportCard";
 import {
   FileText, MapPin, Clock, AlertTriangle,
   Users, TrendingUp, DollarSign, BarChart3,
@@ -13,7 +15,6 @@ import {
 } from "recharts";
 
 type Pantry = { id: string; name: string; latitude: number; longitude: number; hours: string; description: string };
-type FeedbackItem = { id: string; text: string; sentiment: string; tags: string[]; createdAt: string };
 
 const waitTimeTrends = [
   { date: "Mar 6", avgWait: 25, reports: 45 },
@@ -29,7 +30,7 @@ const waitTimeTrends = [
 export function OverviewPage() {
   const { role } = useApp();
   const [pantries, setPantries] = useState<Pantry[]>([]);
-  const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
+  const [feedback, setFeedback] = useState<FeedbackReport[]>([]);
 
   useEffect(() => {
     fetch("/api/map-data").then(r => r.json()).then(d => setPantries(d.pantries || []));
@@ -86,46 +87,29 @@ export function OverviewPage() {
       <div className="grid grid-cols-4 gap-6">{renderKPIs()}</div>
 
       <div className="grid grid-cols-3 gap-6">
-        {/* Pantry summary */}
-        <div className="col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="mb-4 text-gray-900">Active Pantry Locations</h2>
-          <div className="space-y-3">
-            {pantries.map((p) => (
-              <div key={p.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{p.name}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{p.hours}</p>
-                </div>
-                <span className="px-2 py-1 text-xs rounded-full bg-[#2E7D32]/10 text-[#2E7D32]">Active</span>
-              </div>
-            ))}
-          </div>
+        <div className="col-span-2">
+          <ImpactMap
+            title="Food Resource Map"
+            subtitle="Interactive map of pantry locations and demand layers"
+            pantries={pantries}
+          />
         </div>
 
-        {/* Recent Feedback */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="mb-4 text-gray-900">Recent Feedback</h3>
-          <div className="space-y-4">
-            {feedback.slice(0, 4).map((fb) => (
-              <div key={fb.id} className="border-b border-gray-100 pb-3 last:border-0">
-                <div className="flex items-center justify-between mb-1">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    fb.sentiment === "Positive" ? "bg-green-100 text-green-800" :
-                    fb.sentiment === "Negative" ? "bg-red-100 text-red-800" :
-                    "bg-gray-100 text-gray-700"
-                  }`}>{fb.sentiment}</span>
-                  <span className="text-xs text-gray-400">
-                    {new Date(fb.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-700 line-clamp-2">{fb.text}</p>
-                <div className="flex gap-1 mt-1 flex-wrap">
-                  {fb.tags?.map((t) => (
-                    <span key={t} className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{t}</span>
-                  ))}
-                </div>
-              </div>
-            ))}
+        <div className="space-y-4">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-start justify-between">
+              <h3 className="text-gray-900">Recent Reports</h3>
+              <span className="text-xs text-gray-500">Showing latest feedback</span>
+            </div>
+
+            <div className="mt-4 space-y-4 max-h-[520px] overflow-y-auto">
+              {feedback.slice(0, 4).map((fb) => (
+                <ReportCard key={fb.id} report={fb} />
+              ))}
+              {feedback.length === 0 && (
+                <p className="text-sm text-gray-500">No recent reports yet.</p>
+              )}
+            </div>
           </div>
         </div>
       </div>
