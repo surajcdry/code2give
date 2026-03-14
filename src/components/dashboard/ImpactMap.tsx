@@ -2,85 +2,49 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
-import dynamic from 'next/dynamic';
+import { GoogleMap, Marker, Circle, InfoWindow } from '@react-google-maps/api';
 
-// Next.js dynamic import for Leaflet (needs window object, can't SSR)
-const MapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapContainer), { ssr: false });
-const TileLayer = dynamic(() => import('react-leaflet').then(mod => mod.TileLayer), { ssr: false });
-const Marker = dynamic(() => import('react-leaflet').then(mod => mod.Marker), { ssr: false });
-const Popup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), { ssr: false });
-const CircleMarker = dynamic(() => import('react-leaflet').then(mod => mod.CircleMarker), { ssr: false });
-
-// Types
 type Pantry = { id: string; name: string; latitude: number; longitude: number; hours: string; description: string };
 
-interface ImpactMapProps {
-  title?: string;
-  subtitle?: string;
-  initialLayer?: "pantry" | "poverty";
-  pantries?: Pantry[];
-}
+const mapContainerStyle = {
+  width: '100%',
+  height: '100%',
+};
 
-export default function ImpactMap({
-  title = "NYC Impact Layer",
-  subtitle = "Live data from Lemontree InsightEngine",
-  initialLayer = "pantry",
-  pantries: initialPantries,
-}: ImpactMapProps) {
-  const [layer, setLayer] = useState<"pantry" | "poverty">(initialLayer);
-  const [pantries, setPantries] = useState<Pantry[]>(initialPantries ?? []);
-  const [mounted, setMounted] = useState(false);
+const center = {
+  lat: 40.730610,
+  lng: -73.935242,
+};
 
-  // Update map data if the parent provides new values
-  useEffect(() => {
-    if (initialPantries) {
-      setPantries(initialPantries);
-    }
-  }, [initialPantries]);
-
-  // NYC center
-  const position: [number, number] = [40.730610, -73.935242];
+export default function ImpactMap() {
+  const [layer, setLayer] = useState<"pantry" | "poverty">("pantry");
+  const [pantries, setPantries] = useState<Pantry[]>([]);
+  const [selectedMarker, setSelectedMarker] = useState<Pantry | null>(null);
 
   useEffect(() => {
-    setMounted(true);
-
-    // Fix Leaflet default icon paths
-    (async function init() {
-      const L = await import('leaflet');
-      delete (L.Icon.Default.prototype as any)._getIconUrl;
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-      });
-    })();
-
-    // If data was not provided by the parent, load it ourselves.
-    if (!initialPantries) {
-      fetch('/api/map-data')
-        .then(res => res.json())
-        .then(data => {
-          if (data.pantries) setPantries(data.pantries);
-        })
-        .catch(err => console.error("Map Data Error:", err));
-    }
-  }, [initialPantries]);
+    fetch('/api/map-data')
+      .then(res => res.json())
+      .then(data => {
+        if (data.pantries) setPantries(data.pantries);
+      })
+      .catch(err => console.error("Map Data Error:", err));
+  }, []);
 
   return (
     <div className="rounded-xl border border-border overflow-hidden shadow-sm flex flex-col h-[500px]">
       {/* Map Control Header */}
       <div className="bg-card p-4 border-b border-slate-100 flex items-center justify-between z-10 relative">
         <div>
-          <h3 className="font-semibold text-foreground text-sm uppercase tracking-wider">{title}</h3>
-          <p className="text-xs text-muted-foreground">{subtitle}</p>
+          <h3 className="font-semibold text-slate-900">NYC Impact Layer</h3>
+          <p className="text-sm text-primary-foreground0">Live data from Lemontree InsightEngine</p>
         </div>
 
-        <div className="flex bg-accent/10 p-1 rounded-md border border-accent/20">
+        <div className="flex bg-slate-100 p-1 rounded-lg">
           <Button
             variant={layer === "pantry" ? "default" : "ghost"}
             size="sm"
             onClick={() => setLayer("pantry")}
-            className="rounded-sm"
+            className="rounded-md"
           >
             Pantry Density
           </Button>
@@ -88,7 +52,7 @@ export default function ImpactMap({
             variant={layer === "poverty" ? "default" : "ghost"}
             size="sm"
             onClick={() => setLayer("poverty")}
-            className="rounded-sm"
+            className="rounded-md"
           >
             Poverty SNAP Need
           </Button>
@@ -97,39 +61,60 @@ export default function ImpactMap({
 
       {/* Map */}
       <div className="flex-1 w-full relative z-0">
-        {mounted ? (
-          <MapContainer center={position} zoom={11} scrollWheelZoom={false} style={{ height: '100%', width: '100%' }}>
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
+        <GoogleMap
+          mapContainerStyle={mapContainerStyle}
+          center={center}
+          zoom={11}
+          options={{
+            scrollwheel: false,
+          }}
+        >
+          {layer === 'pantry' && pantries.map((pantry) => (
+            <Marker
+              key={pantry.id}
+              position={{ lat: pantry.latitude, lng: pantry.longitude }}
+              onClick={() => setSelectedMarker(pantry)}
+            >
+              {selectedMarker?.id === pantry.id && (
+                <InfoWindow onCloseClick={() => setSelectedMarker(null)}>
+                  <div className="w-48">
+                    <strong className="block mb-1 font-semibold">{pantry.name}</strong>
+                    <p className="text-xs text-muted-foreground mb-1">{pantry.description}</p>
+                    <span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-800">{pantry.hours}</span>
+                  </div>
+                </InfoWindow>
+              )}
+            </Marker>
+          ))}
 
-            {layer === 'pantry' && pantries.map((pantry) => (
-              <Marker key={pantry.id} position={[pantry.latitude, pantry.longitude]}>
-                <Popup>
-                  <strong className="block mb-1 font-semibold">{pantry.name}</strong>
-                  <p className="text-xs text-muted-foreground mb-1">{pantry.description}</p>
-                  <span className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-800">{pantry.hours}</span>
-                </Popup>
-              </Marker>
-            ))}
-
-            {layer === 'poverty' && pantries.map((pantry, idx) => (
-              <CircleMarker
-                key={`pov-${idx}`}
-                center={[pantry.latitude, pantry.longitude]}
-                pathOptions={{ color: 'red', fillColor: '#f87171', fillOpacity: 0.4 }}
-                radius={25 + idx * 5}
-              >
-                <Popup>SNAP Need Index: {(0.3 + idx * 0.08).toFixed(2)}</Popup>
-              </CircleMarker>
-            ))}
-          </MapContainer>
-        ) : (
-          <div className="flex items-center justify-center h-full bg-slate-50">
-            <p className="text-slate-400 text-sm">Loading Map...</p>
-          </div>
-        )}
+          {layer === 'poverty' && pantries.map((pantry, idx) => (
+            <React.Fragment key={`pov-${idx}`}>
+              <Circle
+                center={{ lat: pantry.latitude, lng: pantry.longitude }}
+                radius={2000 + idx * 400}
+                options={{
+                  fillColor: '#f87171',
+                  fillOpacity: 0.4,
+                  strokeColor: '#dc2626',
+                  strokeOpacity: 0.8,
+                  strokeWeight: 2,
+                }}
+                onClick={() => setSelectedMarker(pantry)}
+              />
+              {selectedMarker?.id === pantry.id && (
+                <InfoWindow
+                  position={{ lat: pantry.latitude, lng: pantry.longitude }}
+                  onCloseClick={() => setSelectedMarker(null)}
+                >
+                  <div className="text-sm">
+                    <strong className="block mb-1">{pantry.name}</strong>
+                    SNAP Need Index: {(0.3 + idx * 0.08).toFixed(2)}
+                  </div>
+                </InfoWindow>
+              )}
+            </React.Fragment>
+          ))}
+        </GoogleMap>
       </div>
     </div>
   );

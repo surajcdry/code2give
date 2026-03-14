@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useApp } from "@/components/layout/AppLayout";
 import { KPICard } from "@/components/dashboard/KPICard";
-import ImpactMap from "@/components/dashboard/ImpactMap";
 import { ReportCard, FeedbackReport } from "@/components/dashboard/ReportCard";
+import { GoogleMap, Marker, InfoWindow, Circle } from "@react-google-maps/api";
 import {
   FileText, MapPin, Clock, AlertTriangle,
   Users, TrendingUp, DollarSign, BarChart3,
@@ -26,6 +26,92 @@ const waitTimeTrends = [
   { date: "Mar 12", avgWait: 29, reports: 54 },
   { date: "Mar 13", avgWait: 31, reports: 60 },
 ];
+
+const NYC_CENTER = { lat: 40.730610, lng: -73.935242 };
+const MAP_STYLE = { width: "100%", height: "100%" };
+const COVERAGE_RADIUS_M = 800;
+
+function PantryMapCard({ pantries }: { pantries: Pantry[] }) {
+  const [tab, setTab] = useState<"locations" | "coverage">("locations");
+  const [selected, setSelected] = useState<Pantry | null>(null);
+
+  return (
+    <div className="col-span-2 bg-card rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+      {/* Header + Tabs */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <h2 className="text-gray-900">Active Pantry Locations</h2>
+        <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
+          <button
+            onClick={() => setTab("locations")}
+            className={`px-3 py-1 text-xs rounded-md transition-colors ${
+              tab === "locations" ? "bg-white shadow-sm text-gray-900 font-medium" : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Locations
+          </button>
+          <button
+            onClick={() => setTab("coverage")}
+            className={`px-3 py-1 text-xs rounded-md transition-colors ${
+              tab === "coverage" ? "bg-white shadow-sm text-gray-900 font-medium" : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Coverage Area
+          </button>
+        </div>
+      </div>
+
+      {/* Map */}
+      <div className="h-[400px]">
+        <GoogleMap mapContainerStyle={MAP_STYLE} center={NYC_CENTER} zoom={11} options={{ scrollwheel: true, gestureHandling: "greedy", zoomControl: true, disableDefaultUI: false }}>
+          {tab === "locations" && pantries.map((p) => (
+            <Marker
+              key={p.id}
+              position={{ lat: p.latitude, lng: p.longitude }}
+              onClick={() => setSelected(selected?.id === p.id ? null : p)}
+            >
+              {selected?.id === p.id && (
+                <InfoWindow onCloseClick={() => setSelected(null)}>
+                  <div className="w-44">
+                    <p className="font-semibold text-sm mb-1">{p.name}</p>
+                    <p className="text-xs text-gray-500 mb-1">{p.description}</p>
+                    <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded">{p.hours}</span>
+                  </div>
+                </InfoWindow>
+              )}
+            </Marker>
+          ))}
+
+          {tab === "coverage" && pantries.map((p) => (
+            <Circle
+              key={p.id}
+              center={{ lat: p.latitude, lng: p.longitude }}
+              radius={COVERAGE_RADIUS_M}
+              options={{
+                fillColor: "#2E7D32",
+                fillOpacity: 0.15,
+                strokeColor: "#2E7D32",
+                strokeOpacity: 0.6,
+                strokeWeight: 1.5,
+              }}
+              onClick={() => setSelected(selected?.id === p.id ? null : p)}
+            />
+          ))}
+          {tab === "coverage" && selected && (
+            <InfoWindow
+              position={{ lat: selected.latitude, lng: selected.longitude }}
+              onCloseClick={() => setSelected(null)}
+            >
+              <div className="w-44">
+                <p className="font-semibold text-sm mb-1">{selected.name}</p>
+                <p className="text-xs text-gray-500">~{COVERAGE_RADIUS_M}m coverage radius</p>
+              </div>
+            </InfoWindow>
+          )}
+        </GoogleMap>
+      </div>
+    </div>
+  );
+}
 
 export function OverviewPage() {
   const { role } = useApp();
@@ -87,13 +173,8 @@ export function OverviewPage() {
       <div className="grid grid-cols-4 gap-6">{renderKPIs()}</div>
 
       <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2">
-          <ImpactMap
-            title="Food Resource Map"
-            subtitle="Interactive map of pantry locations and demand layers"
-            pantries={pantries}
-          />
-        </div>
+        {/* Pantry Map */}
+        <PantryMapCard pantries={pantries} />
 
         <div className="space-y-4">
           <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
