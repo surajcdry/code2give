@@ -50,30 +50,66 @@ const TYPE_COLORS: Record<string, string> = {
 };
 const STATUS_COLORS = { PUBLISHED: "#2E7D32", UNAVAILABLE: "#EF5350" };
 
+// ── Filter options ─────────────────────────────────────────────────────────────
+const FILTER_OPTIONS = [
+  { value: "default",         label: "Default (by priority)" },
+  { value: "top_rated",       label: "Top Rated" },
+  { value: "needs_attention", label: "Needs Attention (low rating)" },
+  { value: "most_subscribed", label: "Most Subscribed" },
+  { value: "most_reviewed",   label: "Most Reviewed" },
+] as const;
+
+type FilterValue = typeof FILTER_OPTIONS[number]["value"];
+
 // ── Sub-components ─────────────────────────────────────────────────────────────
-function PantryMapCard({ pantries }: { pantries: Pantry[] }) {
+function PantryMapCard() {
   const [tab, setTab] = useState<"locations" | "coverage">("locations");
   const [selected, setSelected] = useState<Pantry | null>(null);
+  const [filter, setFilter] = useState<FilterValue>("default");
+  const [pantries, setPantries] = useState<Pantry[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    setSelected(null);
+    fetch(`/api/map-data?filter=${filter}`)
+      .then(r => r.json())
+      .then(d => setPantries(d.pantries || []))
+      .finally(() => setLoading(false));
+  }, [filter]);
 
   return (
     <div className="col-span-2 bg-card rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 gap-4">
         <div>
           <h2 className="text-gray-900">Active Pantry Locations</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Top 500 by priority · NYC metro area</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {loading ? "Loading…" : `Top 500 · ${FILTER_OPTIONS.find(o => o.value === filter)?.label}`}
+          </p>
         </div>
-        <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
-          {(["locations", "coverage"] as const).map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-3 py-1 text-xs rounded-md capitalize transition-colors ${
-                tab === t ? "bg-white shadow-sm text-gray-900 font-medium" : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              {t === "locations" ? "Locations" : "Coverage Area"}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <select
+            value={filter}
+            onChange={e => setFilter(e.target.value as FilterValue)}
+            className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
+          >
+            {FILTER_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
+            {(["locations", "coverage"] as const).map(t => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`px-3 py-1 text-xs rounded-md capitalize transition-colors ${
+                  tab === t ? "bg-white shadow-sm text-gray-900 font-medium" : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {t === "locations" ? "Locations" : "Coverage Area"}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       <div className="h-[380px]">
@@ -365,14 +401,12 @@ function KPIs({ role, insights, totalPantries }: {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export function OverviewPage() {
   const { role } = useApp();
-  const [pantries, setPantries] = useState<Pantry[]>([]);
   const [totalPantries, setTotalPantries] = useState(0);
   const [insights, setInsights] = useState<Insights | null>(null);
   const [activeTable, setActiveTable] = useState<"reviews" | "subscribers">("subscribers");
 
   useEffect(() => {
     fetch("/api/map-data").then(r => r.json()).then(d => {
-      setPantries(d.pantries || []);
       setTotalPantries(d.totalPantries ?? d.pantries?.length ?? 0);
     });
     fetch("/api/insights").then(r => r.json()).then(setInsights);
@@ -387,7 +421,7 @@ export function OverviewPage() {
 
       {/* Map + Status */}
       <div className="grid grid-cols-3 gap-6">
-        <PantryMapCard pantries={pantries} />
+        <PantryMapCard />
         {insights && <StatusCard insights={insights} />}
       </div>
 

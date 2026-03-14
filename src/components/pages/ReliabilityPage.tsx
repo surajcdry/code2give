@@ -45,13 +45,83 @@ type ReliabilityData = {
   summary: Summary;
 };
 
+type SortConfig = { key: string; dir: "asc" | "desc" } | null;
+
 const PAGE_SIZE = 20;
+const HP_PAGE_SIZE = 10;
 
 function getBarColor(range: string): string {
   const start = parseInt(range.split("-")[0], 10);
   if (start < 40) return "#EF5350";
   if (start < 60) return "#FFA726";
   return "#2E7D32";
+}
+
+function sortResources(list: Resource[], sort: SortConfig): Resource[] {
+  if (!sort) return list;
+  const { key, dir } = sort;
+  const multiplier = dir === "asc" ? 1 : -1;
+  return [...list].sort((a, b) => {
+    switch (key) {
+      case "city": {
+        const av = a.city ?? "";
+        const bv = b.city ?? "";
+        if (!a.city && b.city) return 1;
+        if (a.city && !b.city) return -1;
+        return multiplier * av.localeCompare(bv);
+      }
+      case "type": {
+        const av = a.type ?? "";
+        const bv = b.type ?? "";
+        if (!a.type && b.type) return 1;
+        if (a.type && !b.type) return -1;
+        return multiplier * av.localeCompare(bv);
+      }
+      case "reliabilityScore":
+        return multiplier * (a.reliabilityScore - b.reliabilityScore);
+      case "ratingAverage": {
+        if (a.ratingAverage == null && b.ratingAverage != null) return 1;
+        if (a.ratingAverage != null && b.ratingAverage == null) return -1;
+        if (a.ratingAverage == null && b.ratingAverage == null) return 0;
+        return multiplier * ((a.ratingAverage as number) - (b.ratingAverage as number));
+      }
+      case "daysCovered":
+        return multiplier * (a.daysCovered - b.daysCovered);
+      case "subscribers":
+        return multiplier * (a.subscribers - b.subscribers);
+      case "reviews":
+        return multiplier * (a.reviews - b.reviews);
+      default:
+        return 0;
+    }
+  });
+}
+
+function SortableHeader({
+  label,
+  sortKey,
+  current,
+  onSort,
+}: {
+  label: string;
+  sortKey: string;
+  current: SortConfig;
+  onSort: (key: string) => void;
+}) {
+  const active = current?.key === sortKey;
+  const isAsc = active && current?.dir === "asc";
+  const isDesc = active && current?.dir === "desc";
+  return (
+    <button
+      onClick={() => onSort(sortKey)}
+      className="flex items-center gap-1 group text-xs font-medium text-gray-500 hover:text-gray-900"
+    >
+      {label}
+      <span className="text-gray-300 group-hover:text-gray-500 text-xs">
+        {isAsc ? "↑" : isDesc ? "↓" : "↕"}
+      </span>
+    </button>
+  );
 }
 
 function ScoreBadge({ score, badge }: { score: number; badge: string }) {
@@ -102,6 +172,9 @@ export function ReliabilityPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [hpPage, setHpPage] = useState(1);
+  const [hpSort, setHpSort] = useState<SortConfig>(null);
+  const [lbSort, setLbSort] = useState<SortConfig>(null);
 
   useEffect(() => {
     fetch("/api/reliability")
@@ -128,14 +201,53 @@ export function ReliabilityPage() {
     );
   }, [data, search]);
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const pageSlice = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // Sorted lists (sort applied before pagination)
+  const sortedHighPriority = useMemo(
+    () => sortResources(highPriority, hpSort),
+    [highPriority, hpSort]
+  );
+
+  const sortedFiltered = useMemo(
+    () => sortResources(filtered, lbSort),
+    [filtered, lbSort]
+  );
+
+  // High priority pagination
+  const hpTotalPages = Math.ceil(sortedHighPriority.length / HP_PAGE_SIZE);
+  const hpSlice = sortedHighPriority.slice(
+    (hpPage - 1) * HP_PAGE_SIZE,
+    hpPage * HP_PAGE_SIZE
+  );
+
+  // Leaderboard pagination
+  const totalPages = Math.ceil(sortedFiltered.length / PAGE_SIZE);
+  const pageSlice = sortedFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // Reset to page 1 when search changes
   const handleSearch = (v: string) => {
     setSearch(v);
     setPage(1);
   };
+
+  // Sort toggle helper — toggles asc → desc → clear
+  const makeToggleSort = (
+    current: SortConfig,
+    setter: React.Dispatch<React.SetStateAction<SortConfig>>,
+    pageSetter: React.Dispatch<React.SetStateAction<number>>
+  ) =>
+    (key: string) => {
+      setter((prev) => {
+        if (prev?.key === key) {
+          if (prev.dir === "asc") return { key, dir: "desc" };
+          return null; // desc → clear
+        }
+        return { key, dir: "asc" };
+      });
+      pageSetter(1);
+    };
+
+  const handleHpSort = makeToggleSort(hpSort, setHpSort, setHpPage);
+  const handleLbSort = makeToggleSort(lbSort, setLbSort, setPage);
 
   return (
     <div className="space-y-6">
@@ -241,15 +353,25 @@ export function ReliabilityPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100">
-                  <th className="text-left text-xs font-medium text-gray-500 px-6 py-3">Name</th>
-                  <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">City</th>
-                  <th className="text-center text-xs font-medium text-gray-500 px-4 py-3">Score</th>
-                  <th className="text-right text-xs font-medium text-gray-500 px-4 py-3">Subscribers</th>
-                  <th className="text-right text-xs font-medium text-gray-500 px-6 py-3">Rating</th>
+                  <th className="text-left px-6 py-3">
+                    <SortableHeader label="Name" sortKey="name" current={hpSort} onSort={handleHpSort} />
+                  </th>
+                  <th className="text-left px-4 py-3">
+                    <SortableHeader label="City" sortKey="city" current={hpSort} onSort={handleHpSort} />
+                  </th>
+                  <th className="text-center px-4 py-3">
+                    <SortableHeader label="Score" sortKey="reliabilityScore" current={hpSort} onSort={handleHpSort} />
+                  </th>
+                  <th className="text-right px-4 py-3">
+                    <SortableHeader label="Subscribers" sortKey="subscribers" current={hpSort} onSort={handleHpSort} />
+                  </th>
+                  <th className="text-right px-6 py-3">
+                    <SortableHeader label="Rating" sortKey="ratingAverage" current={hpSort} onSort={handleHpSort} />
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {highPriority.map((r) => (
+                {hpSlice.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-3">
                       <p className="text-sm font-medium text-gray-900 truncate max-w-xs">{r.name}</p>
@@ -281,6 +403,35 @@ export function ReliabilityPage() {
               </tbody>
             </table>
           </div>
+
+          {/* High Priority Pagination */}
+          {hpTotalPages > 1 && (
+            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+              <p className="text-xs text-gray-500">
+                Showing {(hpPage - 1) * HP_PAGE_SIZE + 1}–{Math.min(hpPage * HP_PAGE_SIZE, sortedHighPriority.length)} of{" "}
+                {sortedHighPriority.length} flagged
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setHpPage((p) => Math.max(1, p - 1))}
+                  disabled={hpPage === 1}
+                  className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-sm text-gray-700">
+                  {hpPage} / {hpTotalPages}
+                </span>
+                <button
+                  onClick={() => setHpPage((p) => Math.min(hpTotalPages, p + 1))}
+                  disabled={hpPage === hpTotalPages}
+                  className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -318,12 +469,24 @@ export function ReliabilityPage() {
                 <thead>
                   <tr className="border-b border-gray-100">
                     <th className="text-left text-xs font-medium text-gray-500 px-6 py-3 w-12">Rank</th>
-                    <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Name</th>
-                    <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">City / Borough</th>
-                    <th className="text-left text-xs font-medium text-gray-500 px-4 py-3">Type</th>
-                    <th className="text-center text-xs font-medium text-gray-500 px-4 py-3">Score</th>
-                    <th className="text-right text-xs font-medium text-gray-500 px-4 py-3">Rating</th>
-                    <th className="text-right text-xs font-medium text-gray-500 px-6 py-3">Days Covered</th>
+                    <th className="text-left px-4 py-3">
+                      <SortableHeader label="Name" sortKey="name" current={lbSort} onSort={handleLbSort} />
+                    </th>
+                    <th className="text-left px-4 py-3">
+                      <SortableHeader label="City / Borough" sortKey="city" current={lbSort} onSort={handleLbSort} />
+                    </th>
+                    <th className="text-left px-4 py-3">
+                      <SortableHeader label="Type" sortKey="type" current={lbSort} onSort={handleLbSort} />
+                    </th>
+                    <th className="text-center px-4 py-3">
+                      <SortableHeader label="Score" sortKey="reliabilityScore" current={lbSort} onSort={handleLbSort} />
+                    </th>
+                    <th className="text-right px-4 py-3">
+                      <SortableHeader label="Rating" sortKey="ratingAverage" current={lbSort} onSort={handleLbSort} />
+                    </th>
+                    <th className="text-right px-6 py-3">
+                      <SortableHeader label="Days Covered" sortKey="daysCovered" current={lbSort} onSort={handleLbSort} />
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -381,8 +544,8 @@ export function ReliabilityPage() {
             {totalPages > 1 && (
               <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
                 <p className="text-xs text-gray-500">
-                  Showing {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of{" "}
-                  {filtered.length.toLocaleString()} resources
+                  Showing {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, sortedFiltered.length)} of{" "}
+                  {sortedFiltered.length.toLocaleString()} resources
                 </p>
                 <div className="flex items-center gap-2">
                   <button

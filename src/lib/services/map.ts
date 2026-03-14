@@ -1,6 +1,16 @@
 import pool from "@/lib/db/pool";
 
-export async function getMapData() {
+const ORDER_BY: Record<string, string> = {
+  top_rated:       '"ratingAverage" DESC NULLS LAST, "subscriberCount" DESC',
+  needs_attention: '"ratingAverage" ASC NULLS LAST, "waitTimeMinutesAverage" DESC NULLS LAST',
+  most_subscribed: '"subscriberCount" DESC NULLS LAST',
+  most_reviewed:   '"reviewCount" DESC NULLS LAST',
+  default:         'priority DESC NULLS LAST, "subscriberCount" DESC',
+};
+
+export async function getMapData(filter = "default") {
+  const orderBy = ORDER_BY[filter] ?? ORDER_BY.default;
+
   // Query real Lemontree resource data — food pantries and soup kitchens with valid coordinates
   const pantryResult = await pool.query(`
     SELECT
@@ -32,7 +42,7 @@ export async function getMapData() {
       AND "resourceStatusId" = 'PUBLISHED'
       AND "resourceTypeId" IN ('FOOD_PANTRY', 'SOUP_KITCHEN', 'COMMUNITY_FRIDGE')
       AND state IN ('NY', 'New York', 'Ny')
-    ORDER BY priority DESC NULLS LAST, "subscriberCount" DESC
+    ORDER BY ${orderBy}
     LIMIT 500
   `);
 

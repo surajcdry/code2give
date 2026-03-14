@@ -11,6 +11,24 @@ type Pantry = {
   resourceTypeId?: string;
 };
 
+const FILTER_OPTIONS = [
+  { value: "default",         label: "Default (by priority)" },
+  { value: "top_rated",       label: "Top Rated" },
+  { value: "needs_attention", label: "Needs Attention (low rating)" },
+  { value: "most_subscribed", label: "Most Subscribed" },
+  { value: "most_reviewed",   label: "Most Reviewed" },
+] as const;
+
+type FilterValue = typeof FILTER_OPTIONS[number]["value"];
+
+const FILTER_DESCRIPTIONS: Record<FilterValue, string> = {
+  default:         "Lemontree's internal priority ranking",
+  top_rated:       "Highest community-rated resources first",
+  needs_attention: "Lowest rated resources — where help is most needed",
+  most_subscribed: "Resources with the most active community followers",
+  most_reviewed:   "Most reviewed resources by community members",
+};
+
 const mapContainerStyle = { width: "100%", height: "100%" };
 const center = { lat: 40.730610, lng: -73.935242 };
 
@@ -24,6 +42,8 @@ export function FoodResourceMapPage() {
   // Map data — top 500 pins for performance
   const [mapPantries, setMapPantries] = useState<Pantry[]>([]);
   const [selectedMarker, setSelectedMarker] = useState<Pantry | null>(null);
+  const [filter, setFilter] = useState<FilterValue>("default");
+  const [mapLoading, setMapLoading] = useState(false);
 
   // List data — full paginated dataset
   const [resources, setResources] = useState<Pantry[]>([]);
@@ -34,12 +54,15 @@ export function FoodResourceMapPage() {
   const [searchInput, setSearchInput] = useState("");
   const [listLoading, setListLoading] = useState(false);
 
-  // Load map pins once
+  // Load map pins — re-fetch when filter changes
   useEffect(() => {
-    fetch("/api/map-data")
+    setMapLoading(true);
+    setSelectedMarker(null);
+    fetch(`/api/map-data?filter=${filter}`)
       .then(r => r.json())
-      .then(d => setMapPantries(d.pantries || []));
-  }, []);
+      .then(d => setMapPantries(d.pantries || []))
+      .finally(() => setMapLoading(false));
+  }, [filter]);
 
   // Load paginated list
   const fetchList = useCallback((p: number, s: string) => {
@@ -65,21 +88,41 @@ export function FoodResourceMapPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <h1 className="text-gray-900">Food Resource Map</h1>
-        <div className="flex items-center gap-3">
-          <Filter className="w-5 h-5 text-gray-500" />
-          <span className="text-sm text-gray-600">
-            {total.toLocaleString()} NYC resources in database
-          </span>
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center gap-3">
+            <Filter className="w-5 h-5 text-gray-500 shrink-0" />
+            <span className="text-sm text-gray-600">
+              {total.toLocaleString()} NYC resources in database
+            </span>
+            <div className="flex items-center gap-2">
+              <label htmlFor="map-filter" className="text-sm text-gray-600 whitespace-nowrap">
+                Sort by:
+              </label>
+              <select
+                id="map-filter"
+                value={filter}
+                onChange={e => setFilter(e.target.value as FilterValue)}
+                className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
+              >
+                {FILTER_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400 italic">{FILTER_DESCRIPTIONS[filter]}</p>
         </div>
       </div>
 
-      {/* Map — top 500 by priority */}
+      {/* Map — top 500 filtered */}
       <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs text-gray-400">
-            Showing top {mapPantries.length} locations by priority
+            {mapLoading
+              ? "Loading locations…"
+              : `Showing top ${mapPantries.length} locations · ${FILTER_OPTIONS.find(o => o.value === filter)?.label}`}
           </p>
         </div>
         <div className="h-[500px] rounded-lg overflow-hidden">
