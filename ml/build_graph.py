@@ -6,44 +6,33 @@ Outputs: graph_nodes.csv, graph_edges.csv
 Prerequisite: Run enrich_resources.py first to populate tractId in Supabase.
 
 Run:
-    pip install psycopg2 pandas numpy scikit-learn requests python-dotenv tqdm
+    pip install psycopg2 pandas numpy scikit-learn python-dotenv
     cd ml
     python build_graph.py
 
 .env.local needs (at project root):
     DIRECT_URL=...
-    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=...   (or GOOGLE_MAPS_MATRIX_API_KEY)
 """
 
 import os
 import json
 import math
-import pickle
 from pathlib import Path
 import psycopg2
-import requests
 import pandas as pd
 import numpy as np
 from sklearn.neighbors import BallTree
 from dotenv import load_dotenv
-from tqdm import tqdm
 
 # Load .env.local from project root (one level up from ml/)
 load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env.local")
 
 # ── Config ────────────────────────────────────────────────────────────────────
 DB_URL          = os.getenv("DIRECT_URL", "").strip('"')
-GMAPS_API_KEY   = os.getenv("GOOGLE_MAPS_MATRIX_API_KEY") or os.getenv("NEXT_PUBLIC_GOOGLE_MAPS_API_KEY")
 K_NEIGHBORS     = 8
 MIN_NEIGHBORS   = 2       # guarantee at least this many edges per node
 MAX_TRAVEL_MIN  = 20
 EARTH_RADIUS_KM = 6371
-BATCH_SIZE      = 25
-
-DISTANCE_MATRIX_URL = "https://maps.googleapis.com/maps/api/distancematrix/json"
-
-CACHE_DIR = Path(__file__).resolve().parent / "cache"
-CACHE_DIR.mkdir(exist_ok=True)
 
 MAGNET_KEYWORDS = ["fresh produce", "meat", "dairy", "hot meals",
                    "groceries", "produce", "fruits", "vegetables"]
@@ -94,87 +83,6 @@ def normalize_col(series):
     if mx == mn:
         return pd.Series([0.0] * len(series), index=series.index)
     return (series - mn) / (mx - mn)
-
-# ── Edge weight helpers ───────────────────────────────────────────────────────
-
-def get_travel_times_batch(origins, destinations):
-    """
-    Call Distance Matrix API for up to BATCH_SIZE origins x all destinations.
-    Returns 2D list [origin_i][dest_j] = minutes, or None on failure.
-    """
-    origins_str = "|".join(f"{lat},{lon}" for lat, lon in origins)
-    dests_str   = "|".join(f"{lat},{lon}" for lat, lon in destinations)
-    try:
-        resp = requests.get(DISTANCE_MATRIX_URL, params={
-            "origins":      origins_str,
-            "destinations": dests_str,
-            "mode":         "driving",
-            "key":          GMAPS_API_KEY
-        }, timeout=15)
-        data = resp.json()
-        if data["status"] != "OK":
-            return None
-        result = []
-        for row in data["rows"]:
-            row_mins = []
-            for el in row["elements"]:
-                if el["status"] == "OK":
-                    row_mins.append(el["duration"]["value"] / 60.0)
-                else:
-                    row_mins.append(None)
-            result.append(row_mins)
-        return result
-    except Exception:
-        return None
-
-def get_all_travel_times(df, candidate_pairs):
-    """
-    Batch all candidate (src, dst) pairs through the Distance Matrix API.
-    Returns dict {(src_idx, dst_idx): travel_minutes}.
-    Uses cache to avoid re-calling on restart.
-    """
-    cache_path = CACHE_DIR / "travel_times.pkl"
-    if cache_path.exists():
-        print("  Loading cached travel times...")
-        with open(cache_path, "rb") as f:
-            return pickle.load(f)
-
-    src_to_dsts = {}
-    for src, dst in candidate_pairs:
-        src_to_dsts.setdefault(src, []).append(dst)
-
-    src_list     = list(src_to_dsts.keys())
-    travel_times = {}
-    n_batches    = math.ceil(len(src_list) / BATCH_SIZE)
-
-    for batch_start in tqdm(range(0, len(src_list), BATCH_SIZE),
-                            total=n_batches, desc="  Distance Matrix API"):
-
-        batch_srcs = src_list[batch_start: batch_start + BATCH_SIZE]
-        batch_dsts = list({dst for src in batch_srcs for dst in src_to_dsts[src]})
-
-        origins      = [(df.at[i, "lat"], df.at[i, "lon"]) for i in batch_srcs]
-        destinations = [(df.at[j, "lat"], df.at[j, "lon"]) for j in batch_dsts]
-
-        result = get_travel_times_batch(origins, destinations)
-
-        if result is None:
-            continue
-
-        dst_pos = {dst: pos for pos, dst in enumerate(batch_dsts)}
-
-        for src_pos, src in enumerate(batch_srcs):
-            for dst in src_to_dsts[src]:
-                mins = result[src_pos][dst_pos[dst]]
-                if mins is not None:
-                    travel_times[(src, dst)] = mins
-
-    # Cache results
-    with open(cache_path, "wb") as f:
-        pickle.dump(travel_times, f)
-    print(f"  Cached travel times to {cache_path}")
-
-    return travel_times
 
 # ── Edge filtering with minimum neighbor guarantee ────────────────────────────
 
@@ -235,8 +143,6 @@ def build_edges(candidate_pairs, travel_times, num_nodes):
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    if not GMAPS_API_KEY:
-        raise EnvironmentError("No Google Maps API key found in .env.local")
     if not DB_URL:
         raise EnvironmentError("DIRECT_URL not set in .env.local")
 
@@ -335,48 +241,58 @@ def main():
     df[node_cols].to_csv("graph_nodes.csv", index=True, index_label="nodeIdx")
     print(f"Saved graph_nodes.csv ({len(df)} nodes)")
 
-    # ── 5. KNN candidate pairs ────────────────────────────────────────────────
-    print("\nFinding KNN candidate pairs...")
+    # ── 5. KNN candidate pairs & Travel Time Estimation (Haversine) ───────────
+    # Can't use Google Maps Distance Matrix API -> would cost ~$500
+    print("\nFinding KNN candidate pairs and estimating travel times (Haversine)...")
 
     distances, neighbors = tree.query(coords_rad, k=K_NEIGHBORS + 1)
 
-    candidate_pairs = [
-        (i, int(neighbors[i][k]))
-        for i in range(len(df))
-        for k in range(1, K_NEIGHBORS + 1)
-    ]
+    candidate_pairs = []
+    travel_times = {}
 
-    # ── 6. Travel times via Distance Matrix API ───────────────────────────────
-    travel_times = get_all_travel_times(df, candidate_pairs)
+    for i in range(len(df)):
+        for k in range(1, K_NEIGHBORS + 1):
+            dst = int(neighbors[i][k])
+            candidate_pairs.append((i, dst))
+            
+            # distances[i][k] is in radians. Convert to km.
+            dist_km = distances[i][k] * EARTH_RADIUS_KM
+            
+            # Estimate: 1 km straight-line = ~2 mins driving time
+            est_minutes = dist_km * 2.0
+            
+            travel_times[(i, dst)] = est_minutes
 
-    # ── 7. Filter edges with minimum neighbor guarantee ───────────────────────
+    # ── 6. Filter edges with minimum neighbor guarantee ───────────────────────
     print("Building edges (min 2 neighbors guaranteed)...")
 
     edge_list = build_edges(candidate_pairs, travel_times, len(df))
-    edges_df  = pd.DataFrame(edge_list)
+    edges_df  = pd.DataFrame(edge_list, columns=["src", "dst", "travelMinutes", "weight"])
 
-    # Deduplicate (reverse edges may create duplicates)
-    edges_df = edges_df.drop_duplicates(subset=["src", "dst"])
+    if edges_df.empty:
+        print("\n  [ERROR] 0 edges built!")
+    else:
+        # Deduplicate (reverse edges may create duplicates)
+        edges_df = edges_df.drop_duplicates(subset=["src", "dst"])
 
     edges_df.to_csv("graph_edges.csv", index=False)
     print(f"Saved graph_edges.csv ({len(edges_df)} edges)")
 
     # ── Summary ───────────────────────────────────────────────────────────────
-    edges_per_node = edges_df.groupby("src").size()
-
     print(f"\n── Summary ─────────────────────────────────────────────────────")
     print(f"  Nodes:              {len(df)}")
     print(f"  Edges:              {len(edges_df)}")
-    if len(edges_df):
+    if not edges_df.empty:
+        edges_per_node = edges_df.groupby("src").size()
         print(f"  Avg edges/node:     {edges_per_node.mean():.1f}")
         print(f"  Min edges/node:     {edges_per_node.min()}")
         print(f"  Max edges/node:     {edges_per_node.max()}")
-        print(f"  Avg travel time:    {edges_df['travelMinutes'].mean():.1f} min")
+        print(f"  Avg assumed time:   {edges_df['travelMinutes'].mean():.1f} min")
         print(f"  Avg edge weight:    {edges_df['weight'].mean():.3f}")
 
         # How many nodes got the "rescue" treatment
         beyond_threshold = edges_df[edges_df["travelMinutes"] > MAX_TRAVEL_MIN]
-        if len(beyond_threshold):
+        if not beyond_threshold.empty:
             nodes_rescued = beyond_threshold["src"].nunique()
             print(f"  Nodes with edges > {MAX_TRAVEL_MIN} min (rescued): {nodes_rescued}")
 
