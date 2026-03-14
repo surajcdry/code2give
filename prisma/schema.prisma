@@ -3,13 +3,12 @@
 
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
-generator client {
-  provider = "prisma-client"
-  output   = "../node_modules/@prisma/client"
-}
-
 datasource db {
   provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
 }
 
 enum Role {
@@ -27,25 +26,57 @@ model Stakeholder {
   updatedAt DateTime @updatedAt
 }
 
-model Pantry {
-  id          String   @id @default(cuid())
-  name        String
-  location    String
-  latitude    Float?
-  longitude   Float?
-  hours       String
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model Resource {
+  id                       String   @id  // Use the API's own ID
+  name                     String?
+  description              String?
+  description_es           String?
+  addressStreet1           String?
+  addressStreet2           String?
+  city                     String?
+  state                    String?
+  zipCode                  String?
+  latitude                 Float?
+  longitude                Float?
+  timezone                 String?
+  website                  String?
+  resourceTypeId           String?  // e.g. "FOOD_PANTRY", "SNAP_EBT", "SOUP_KITCHEN"
+  resourceTypeName         String?
+  resourceStatusId         String?  // "PUBLISHED", "UNPUBLISHED", "REMOVED"
+  openByAppointment        Boolean  @default(false)
+  appointmentRequired      Boolean  @default(false)
+  acceptingNewClients      Boolean  @default(true)
+  confidence               Float?
+  ratingAverage            Float?
+  waitTimeMinutesAverage   Float?
+  reviewCount              Int      @default(0)
+  subscriberCount          Int      @default(0)
+  priority                 Int?
+  mergedToResourceId       String?
+  // Store nested arrays as JSON — easy to query, no extra tables needed
+  contacts                 Json     @default("[]")
+  images                   Json     @default("[]")
+  shifts                   Json     @default("[]")
+  occurrences              Json     @default("[]")
+  occurrenceSkipRanges     Json     @default("[]")
+  tags                     Json     @default("[]")
+  regionsServed            Json     @default("[]")
+  resourceSlugs            Json     @default("[]")
+  syncedAt                 DateTime @default(now())
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  feedback                 Feedback[]
 }
 
 model Feedback {
-  id        String   @id @default(cuid())
-  text      String
-  sentiment String?
-  tags      String[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  text       String
+  sentiment  String?
+  tags       String[]
+  resourceId String?
+  resource   Resource? @relation(fields: [resourceId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model CensusData {
