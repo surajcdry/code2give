@@ -7,6 +7,7 @@ import { CommunityReportsPage } from "@/components/pages/CommunityReportsPage";
 import { TrendsPage } from "@/components/pages/TrendsPage";
 import { ServiceIssuesPage } from "@/components/pages/ServiceIssuesPage";
 import { SettingsPage } from "@/components/pages/SettingsPage";
+import { DataTablePage } from "@/components/pages/DataTablePage";
 
 function PageContent() {
   const { page } = useApp();
@@ -22,6 +23,8 @@ function PageContent() {
       return <TrendsPage />;
     case "issues":
       return <ServiceIssuesPage />;
+    case "table":
+      return <DataTablePage />;
     case "settings":
       return <SettingsPage />;
     case "availability":

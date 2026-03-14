@@ -3,11 +3,11 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import {
   LayoutDashboard, MapPin, FileText, TrendingUp,
-  Apple, AlertTriangle, Settings, ChevronDown, User, Leaf, PanelLeftClose, PanelLeftOpen,
+  Apple, AlertTriangle, Settings, ChevronDown, User, Leaf, PanelLeftClose, PanelLeftOpen, Table2,
 } from "lucide-react";
 
 export type UserRole = "internal" | "government" | "donor" | "provider";
-export type PageId = "overview" | "map" | "reports" | "trends" | "availability" | "issues" | "settings";
+export type PageId = "overview" | "map" | "reports" | "trends" | "availability" | "issues" | "settings" | "table";
 
 interface AppContextType {
   role: UserRole;
@@ -38,6 +38,7 @@ const navItems: { id: PageId; label: string; icon: React.ElementType }[] = [
   { id: "trends", label: "Trends & Analytics", icon: TrendingUp },
   { id: "availability", label: "Food Availability", icon: Apple },
   { id: "issues", label: "Service Issues", icon: AlertTriangle },
+  { id: "table", label: "Data Table", icon: Table2 },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
