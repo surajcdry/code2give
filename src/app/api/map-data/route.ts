@@ -7,6 +7,7 @@ export async function GET() {
 
     return NextResponse.json({
       pantries: data.pantries,
+      totalPantries: data.totalPantries,
       censusStats: data.censusStats,
     });
   } catch (error) {

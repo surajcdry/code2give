@@ -1,9 +1,9 @@
 import { Pool } from "pg";
 
-// Use DIRECT_DATABASE_URL for the raw pg driver.
-// This matches what Prisma uses for schema operations.
+// Use DIRECT_URL (direct Supabase connection, bypasses pgbouncer).
+// Falls back to DIRECT_DATABASE_URL for local dev compatibility.
 const pool = new Pool({
-  connectionString: process.env.DIRECT_DATABASE_URL,
+  connectionString: process.env.DIRECT_URL ?? process.env.DIRECT_DATABASE_URL,
 });
 
 export default pool;
