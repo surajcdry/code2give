@@ -51,9 +51,9 @@ const staticIssues: ServiceIssue[] = [
 function getSeverityClass(severity: string) {
   switch (severity) {
     case "high":
-      return "text-red-800 bg-red-100";
+      return "text-destructive bg-destructive/10";
     case "medium":
-      return "text-orange-800 bg-orange-100";
+      return "text-destructive bg-destructive/20";
     case "low":
       return "text-yellow-800 bg-yellow-100";
     default:
@@ -144,37 +144,37 @@ export function ServiceIssuesPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+        <div className="bg-card rounded-lg p-6 shadow-sm border border-gray-200">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="w-5 h-5 text-red-600" />
             <p className="text-sm text-gray-600">Active Issues</p>
           </div>
-          <p className="text-3xl text-gray-900">{activeIssues.length}</p>
+          <p className="text-primaryxl text-gray-900">{activeIssues.length}</p>
           <p className="text-xs text-gray-500 mt-1">Require immediate attention</p>
         </div>
 
-        <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+        <div className="bg-card rounded-lg p-6 shadow-sm border border-gray-200">
           <div className="flex items-center gap-2 mb-2">
             <Clock className="w-5 h-5 text-orange-600" />
             <p className="text-sm text-gray-600">Monitoring</p>
           </div>
-          <p className="text-3xl text-gray-900">{monitoringIssues.length}</p>
+          <p className="text-primaryxl text-gray-900">{monitoringIssues.length}</p>
           <p className="text-xs text-gray-500 mt-1">Under observation</p>
         </div>
 
-        <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+        <div className="bg-card rounded-lg p-6 shadow-sm border border-gray-200">
           <div className="flex items-center gap-2 mb-2">
             <CheckCircle className="w-5 h-5 text-green-600" />
             <p className="text-sm text-gray-600">Resolved This Week</p>
           </div>
-          <p className="text-3xl text-gray-900">{resolvedIssues.length}</p>
+          <p className="text-primaryxl text-gray-900">{resolvedIssues.length}</p>
           <p className="text-xs text-gray-500 mt-1">Successfully addressed</p>
         </div>
       </div>
 
       {/* Active Issues */}
       {activeIssues.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-card rounded-lg shadow-sm border border-gray-200">
           <div className="p-6 border-b border-gray-200">
             <h3 className="text-gray-900">Active Issues</h3>
           </div>
@@ -188,7 +188,7 @@ export function ServiceIssuesPage() {
 
       {/* Monitoring Issues */}
       {monitoringIssues.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-card rounded-lg shadow-sm border border-gray-200">
           <div className="p-6 border-b border-gray-200">
             <h3 className="text-gray-900">Under Monitoring</h3>
           </div>
@@ -202,7 +202,7 @@ export function ServiceIssuesPage() {
 
       {/* Resolved Issues */}
       {resolvedIssues.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-card rounded-lg shadow-sm border border-gray-200">
           <div className="p-6 border-b border-gray-200">
             <h3 className="text-gray-900">Recently Resolved</h3>
           </div>
@@ -215,7 +215,7 @@ export function ServiceIssuesPage() {
       )}
 
       {/* Negative Community Feedback */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-card rounded-lg shadow-sm border border-gray-200">
         <div className="p-6 border-b border-gray-200">
           <h3 className="text-gray-900">Negative Community Feedback</h3>
           <p className="text-sm text-gray-500 mt-1">
@@ -246,7 +246,7 @@ export function ServiceIssuesPage() {
                       <p className="text-xs text-gray-500 mt-2">{fb.location}</p>
                     )}
                   </div>
-                  <span className="ml-4 px-3 py-1 rounded-full text-xs text-red-800 bg-red-100 capitalize shrink-0">
+                  <span className="ml-4 px-3 py-1 rounded-full text-xs text-destructive bg-destructive/10 capitalize shrink-0">
                     {fb.sentiment}
                   </span>
                 </div>

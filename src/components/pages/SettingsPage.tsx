@@ -18,9 +18,9 @@ export function SettingsPage() {
       <h1 className="text-gray-900">Settings</h1>
 
       {/* Current Session */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center gap-3 mb-4">
-          <User className="w-5 h-5 text-[#2E7D32]" />
+          <User className="w-5 h-5 text-primary" />
           <h3 className="text-gray-900">Current Session</h3>
         </div>
         <div className="space-y-3">
@@ -40,7 +40,7 @@ export function SettingsPage() {
       </div>
 
       {/* Notifications */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center gap-3 mb-4">
           <Bell className="w-5 h-5 text-[#FF8F00]" />
           <h3 className="text-gray-900">Notifications</h3>
@@ -56,11 +56,11 @@ export function SettingsPage() {
               <span className="text-sm text-gray-600">{item.label}</span>
               <div
                 className={`w-10 h-5 rounded-full flex items-center px-0.5 transition-colors ${
-                  item.enabled ? "bg-[#2E7D32]" : "bg-gray-300"
+                  item.enabled ? "bg-primary" : "bg-gray-300"
                 }`}
               >
                 <div
-                  className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
+                  className={`w-4 h-4 rounded-full bg-card shadow-sm transition-transform ${
                     item.enabled ? "translate-x-5" : "translate-x-0"
                   }`}
                 />
@@ -71,7 +71,7 @@ export function SettingsPage() {
       </div>
 
       {/* Data & Privacy */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center gap-3 mb-4">
           <Shield className="w-5 h-5 text-[#42A5F5]" />
           <h3 className="text-gray-900">Data & Privacy</h3>
@@ -83,7 +83,7 @@ export function SettingsPage() {
       </div>
 
       {/* System Info */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center gap-3 mb-4">
           <Database className="w-5 h-5 text-gray-400" />
           <h3 className="text-gray-900">System</h3>

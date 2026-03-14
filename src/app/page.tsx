@@ -28,7 +28,7 @@ function PageContent() {
       return (
         <div className="space-y-6">
           <h1 className="text-gray-900">Food Availability</h1>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-12 text-center">
             <p className="text-gray-500">
               Real-time inventory tracking coming soon. Check the Trends page for weekly availability data.
             </p>

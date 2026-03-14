@@ -87,7 +87,7 @@ export function OverviewPage() {
 
       <div className="grid grid-cols-3 gap-6">
         {/* Pantry summary */}
-        <div className="col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="col-span-2 bg-card rounded-lg shadow-sm border border-gray-200 p-6">
           <h2 className="mb-4 text-gray-900">Active Pantry Locations</h2>
           <div className="space-y-3">
             {pantries.map((p) => (
@@ -96,22 +96,22 @@ export function OverviewPage() {
                   <p className="text-sm font-medium text-gray-900">{p.name}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{p.hours}</p>
                 </div>
-                <span className="px-2 py-1 text-xs rounded-full bg-[#2E7D32]/10 text-[#2E7D32]">Active</span>
+                <span className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">Active</span>
               </div>
             ))}
           </div>
         </div>
 
         {/* Recent Feedback */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
           <h3 className="mb-4 text-gray-900">Recent Feedback</h3>
           <div className="space-y-4">
             {feedback.slice(0, 4).map((fb) => (
               <div key={fb.id} className="border-b border-gray-100 pb-3 last:border-0">
                 <div className="flex items-center justify-between mb-1">
                   <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    fb.sentiment === "Positive" ? "bg-green-100 text-green-800" :
-                    fb.sentiment === "Negative" ? "bg-red-100 text-red-800" :
+                    fb.sentiment === "Positive" ? "bg-primary/10 text-primary" :
+                    fb.sentiment === "Negative" ? "bg-destructive/10 text-destructive" :
                     "bg-gray-100 text-gray-700"
                   }`}>{fb.sentiment}</span>
                   <span className="text-xs text-gray-400">
@@ -131,7 +131,7 @@ export function OverviewPage() {
       </div>
 
       {/* Trends Chart */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 className="mb-4 text-gray-900">Wait Time & Report Trends</h3>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={waitTimeTrends}>

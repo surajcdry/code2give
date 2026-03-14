@@ -38,41 +38,41 @@ export function TrendsPage() {
       <h1 className="text-gray-900">Trends & Analytics</h1>
 
       <div className="grid grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+        <div className="bg-card rounded-lg p-6 shadow-sm border border-gray-200">
           <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-5 h-5 text-[#2E7D32]" />
+            <TrendingUp className="w-5 h-5 text-primary" />
             <p className="text-sm text-gray-600">Report Volume</p>
           </div>
-          <p className="text-2xl text-gray-900">+24%</p>
+          <p className="text-primaryxl text-gray-900">+24%</p>
           <p className="text-xs text-gray-500 mt-1">vs last week</p>
         </div>
-        <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+        <div className="bg-card rounded-lg p-6 shadow-sm border border-gray-200">
           <div className="flex items-center gap-2 mb-2">
             <Clock className="w-5 h-5 text-[#FF8F00]" />
             <p className="text-sm text-gray-600">Avg Wait Time</p>
           </div>
-          <p className="text-2xl text-gray-900">+8%</p>
+          <p className="text-primaryxl text-gray-900">+8%</p>
           <p className="text-xs text-gray-500 mt-1">Increasing trend</p>
         </div>
-        <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+        <div className="bg-card rounded-lg p-6 shadow-sm border border-gray-200">
           <div className="flex items-center gap-2 mb-2">
             <Users className="w-5 h-5 text-[#42A5F5]" />
             <p className="text-sm text-gray-600">Peak Day</p>
           </div>
-          <p className="text-2xl text-gray-900">Tuesday</p>
+          <p className="text-primaryxl text-gray-900">Tuesday</p>
           <p className="text-xs text-gray-500 mt-1">Highest demand</p>
         </div>
-        <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+        <div className="bg-card rounded-lg p-6 shadow-sm border border-gray-200">
           <div className="flex items-center gap-2 mb-2">
-            <TrendingDown className="w-5 h-5 text-[#2E7D32]" />
+            <TrendingDown className="w-5 h-5 text-primary" />
             <p className="text-sm text-gray-600">Food Availability</p>
           </div>
-          <p className="text-2xl text-gray-900">-12%</p>
+          <p className="text-primaryxl text-gray-900">-12%</p>
           <p className="text-xs text-gray-500 mt-1">Produce declining</p>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 className="mb-4 text-gray-900">Wait Time & Report Volume Trends</h3>
         <ResponsiveContainer width="100%" height={350}>
           <LineChart data={waitTimeTrends}>
@@ -88,7 +88,7 @@ export function TrendsPage() {
         </ResponsiveContainer>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 className="mb-4 text-gray-900">Demand by Borough</h3>
         <ResponsiveContainer width="100%" height={350}>
           <BarChart data={demandByDistrict}>
@@ -111,7 +111,7 @@ export function TrendsPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 className="mb-4 text-gray-900">Food Availability Trends (% Available)</h3>
         <ResponsiveContainer width="100%" height={350}>
           <LineChart data={foodAvailabilityTrends}>
