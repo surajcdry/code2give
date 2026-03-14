@@ -1,259 +1,230 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, Clock, CheckCircle } from "lucide-react";
+import { AlertTriangle, Clock, Info, CheckCircle } from "lucide-react";
 
-interface ServiceIssue {
-  id: string;
-  resourceName: string;
-  issue: string;
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface Alert {
+  type: string;
   severity: "high" | "medium" | "low";
-  reportedDate: string;
-  status: "active" | "monitoring" | "resolved";
+  title: string;
+  description: string;
+  count: number;
+  zipCode?: string;
+  id?: string;
 }
 
-// Derived from DB feedback + static operational issues
-const staticIssues: ServiceIssue[] = [
-  {
-    id: "d1",
-    resourceName: "Bronx Community Pantry",
-    issue: "High demand, low inventory — multiple reports of empty shelves",
-    severity: "high",
-    reportedDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    status: "active",
-  },
-  {
-    id: "d2",
-    resourceName: "Harlem Food Hub",
-    issue: "Long wait times exceeding 60 minutes on weekday mornings",
-    severity: "high",
-    reportedDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    status: "active",
-  },
-  {
-    id: "d3",
-    resourceName: "Queens Boulevard Pantry",
-    issue: "Staff shortage on Wednesdays — reduced service hours",
-    severity: "medium",
-    reportedDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    status: "monitoring",
-  },
-  {
-    id: "d4",
-    resourceName: "Brooklyn Bridge Fridge",
-    issue: "Equipment maintenance — refrigeration unit repaired",
-    severity: "low",
-    reportedDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    status: "resolved",
-  },
-];
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getSeverityClass(severity: string) {
-  switch (severity) {
-    case "high":
-      return "text-destructive bg-destructive/10";
-    case "medium":
-      return "text-destructive bg-destructive/20";
-    case "low":
-      return "text-yellow-800 bg-yellow-100";
-    default:
-      return "text-gray-800 bg-gray-100";
+function AlertIcon({ type, severity }: { type: string; severity: string }) {
+  const cls = "w-5 h-5 shrink-0 mt-0.5";
+  if (type === "DATA_GAP" || type === "COVERAGE_GAP") {
+    return <Info className={`${cls} text-yellow-500`} />;
   }
-}
-
-function getStatusClass(status: string) {
-  switch (status) {
-    case "active":
-      return "border-red-300 bg-red-50";
-    case "monitoring":
-      return "border-orange-300 bg-orange-50";
-    case "resolved":
-      return "border-green-300 bg-green-50";
-    default:
-      return "border-gray-200 bg-gray-50";
+  if (severity === "high") {
+    return <AlertTriangle className={`${cls} text-red-500`} />;
   }
+  return <Clock className={`${cls} text-yellow-500`} />;
 }
 
-interface NegativeFeedback {
-  id: number;
-  text: string;
-  location: string | null;
-  sentiment: string;
-  created_at: string;
+function leftBorderClass(severity: string) {
+  if (severity === "high") return "border-l-4 border-red-400 bg-red-50";
+  return "border-l-4 border-yellow-400 bg-yellow-50";
 }
 
-export function ServiceIssuesPage() {
-  const [negativeFeedback, setNegativeFeedback] = useState<NegativeFeedback[]>([]);
-  const [loading, setLoading] = useState(true);
+function typePill(type: string) {
+  const label = type.replace(/_/g, " ");
+  return (
+    <span className="text-[10px] font-semibold tracking-widest uppercase px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 shrink-0">
+      {label}
+    </span>
+  );
+}
 
-  useEffect(() => {
-    fetch("/api/analyze-feedback")
-      .then((r) => r.json())
-      .then((data) => {
-        const items: NegativeFeedback[] = (data.feedback || []).filter(
-          (f: NegativeFeedback) =>
-            f.sentiment === "negative" || f.sentiment === "critical"
-        );
-        setNegativeFeedback(items);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+// ─── Individual Alert Card ────────────────────────────────────────────────────
 
-  const activeIssues = staticIssues.filter((d) => d.status === "active");
-  const monitoringIssues = staticIssues.filter((d) => d.status === "monitoring");
-  const resolvedIssues = staticIssues.filter((d) => d.status === "resolved");
+function AlertCard({ alert }: { alert: Alert }) {
+  const isHighUnavailability = alert.type === "HIGH_UNAVAILABILITY";
+  const isLowRatedHighTraffic = alert.type === "LOW_RATED_HIGH_TRAFFIC";
 
-  const IssueCard = ({ issue }: { issue: ServiceIssue }) => (
-    <div className={`p-6 border-l-4 ${getStatusClass(issue.status)}`}>
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <h4 className="text-gray-900">{issue.resourceName}</h4>
-          <p className="text-sm text-gray-700 mt-1">{issue.issue}</p>
-          <p className="text-xs text-gray-500 mt-2">
-            Reported{" "}
-            {new Date(issue.reportedDate).toLocaleDateString("en-US", {
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-            })}
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-2 ml-4 shrink-0">
-          <span
-            className={`px-3 py-1 rounded-full text-xs capitalize ${getSeverityClass(issue.severity)}`}
-          >
-            {issue.severity} severity
-          </span>
-          {issue.status === "resolved" ? (
-            <span className="text-xs text-green-700 flex items-center gap-1">
-              <CheckCircle className="w-3 h-3" />
-              resolved
-            </span>
-          ) : (
-            <span className="text-xs text-gray-500 capitalize">{issue.status}</span>
+  // For HIGH_UNAVAILABILITY, parse pct from title e.g. "75% of resources unavailable in zip 10001"
+  let pct: number | null = null;
+  if (isHighUnavailability && alert.title) {
+    const m = alert.title.match(/^(\d+)%/);
+    if (m) pct = parseInt(m[1], 10);
+  }
+
+  // For LOW_RATED_HIGH_TRAFFIC, parse rating from description
+  let rating: number | null = null;
+  let subscribers: number | null = null;
+  if (isLowRatedHighTraffic && alert.description) {
+    const ratingMatch = alert.description.match(/Rating\s+([\d.]+)/);
+    const subMatch = alert.description.match(/([\d,]+)\s+subscribers/);
+    if (ratingMatch) rating = parseFloat(ratingMatch[1]);
+    if (subMatch) subscribers = parseInt(subMatch[1].replace(/,/g, ""), 10);
+  }
+
+  return (
+    <div className={`p-5 rounded-lg ${leftBorderClass(alert.severity)}`}>
+      <div className="flex items-start gap-3">
+        <AlertIcon type={alert.type} severity={alert.severity} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 flex-wrap">
+            <p className="font-semibold text-gray-900 text-sm leading-snug">{alert.title}</p>
+            <div className="flex items-center gap-2 shrink-0">
+              {typePill(alert.type)}
+            </div>
+          </div>
+
+          <p className="text-sm text-gray-600 mt-1">{alert.description}</p>
+
+          {/* HIGH_UNAVAILABILITY: zip + progress bar */}
+          {isHighUnavailability && alert.zipCode && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-medium text-gray-500">Zip Code</span>
+                <span className="text-xs font-bold text-gray-900 bg-white border border-gray-200 px-2 py-0.5 rounded-full">
+                  {alert.zipCode}
+                </span>
+              </div>
+              {pct != null && (
+                <>
+                  <div className="flex items-center justify-between mb-1 mt-2">
+                    <span className="text-xs text-gray-500">Unavailability rate</span>
+                    <span className="text-xs font-semibold text-red-700">{pct}%</span>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-red-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-red-500 transition-all duration-500"
+                      style={{ width: `${Math.min(pct, 100)}%` }}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* LOW_RATED_HIGH_TRAFFIC: rating badge + subscriber count */}
+          {isLowRatedHighTraffic && (
+            <div className="flex items-center gap-3 mt-2">
+              {rating != null && (
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                  ★ {rating.toFixed(1)}
+                </span>
+              )}
+              {subscribers != null && (
+                <span className="text-xs text-gray-500">
+                  <span className="font-medium text-gray-800">{subscribers.toLocaleString()}</span> subscribers
+                </span>
+              )}
+            </div>
           )}
         </div>
       </div>
     </div>
   );
+}
+
+// ─── Loading Skeleton ─────────────────────────────────────────────────────────
+
+function AlertSkeleton() {
+  return (
+    <div className="space-y-3">
+      {[1, 2, 3, 4].map((i) => (
+        <div
+          key={i}
+          className="h-20 rounded-lg bg-gray-100 animate-pulse border-l-4 border-gray-200"
+        />
+      ))}
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export function ServiceIssuesPage() {
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/alerts")
+      .then((r) => r.json())
+      .then((data) => {
+        setAlerts(data.alerts ?? []);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const highAlerts = alerts.filter((a) => a.severity === "high");
+  const mediumAlerts = alerts.filter((a) => a.severity === "medium");
 
   return (
     <div className="space-y-6">
-      <h1 className="text-gray-900">Service Issues</h1>
+      <div>
+        <h1 className="text-gray-900">Service Issues &amp; Alerts</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Real-time alerts derived from live database analysis
+        </p>
+      </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-6">
+      {/* ── Summary KPI row ── */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
         <div className="bg-card rounded-lg p-6 shadow-sm border border-gray-200">
-          <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="w-5 h-5 text-red-600" />
-            <p className="text-sm text-gray-600">Active Issues</p>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm text-gray-600">High Severity</p>
+              <p className="text-2xl font-bold mt-2 text-gray-900">
+                {loading ? "—" : highAlerts.length}
+              </p>
+              <p className="text-sm text-gray-500 mt-1">Require immediate attention</p>
+            </div>
+            <div className="w-12 h-12 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-6 h-6 text-red-600" />
+            </div>
           </div>
-          <p className="text-primaryxl text-gray-900">{activeIssues.length}</p>
-          <p className="text-xs text-gray-500 mt-1">Require immediate attention</p>
         </div>
 
         <div className="bg-card rounded-lg p-6 shadow-sm border border-gray-200">
-          <div className="flex items-center gap-2 mb-2">
-            <Clock className="w-5 h-5 text-orange-600" />
-            <p className="text-sm text-gray-600">Monitoring</p>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Medium Severity</p>
+              <p className="text-2xl font-bold mt-2 text-gray-900">
+                {loading ? "—" : mediumAlerts.length}
+              </p>
+              <p className="text-sm text-gray-500 mt-1">Data gaps &amp; coverage issues</p>
+            </div>
+            <div className="w-12 h-12 rounded-lg bg-yellow-50 flex items-center justify-center shrink-0">
+              <Clock className="w-6 h-6 text-yellow-600" />
+            </div>
           </div>
-          <p className="text-primaryxl text-gray-900">{monitoringIssues.length}</p>
-          <p className="text-xs text-gray-500 mt-1">Under observation</p>
-        </div>
-
-        <div className="bg-card rounded-lg p-6 shadow-sm border border-gray-200">
-          <div className="flex items-center gap-2 mb-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <p className="text-sm text-gray-600">Resolved This Week</p>
-          </div>
-          <p className="text-primaryxl text-gray-900">{resolvedIssues.length}</p>
-          <p className="text-xs text-gray-500 mt-1">Successfully addressed</p>
         </div>
       </div>
 
-      {/* Active Issues */}
-      {activeIssues.length > 0 && (
-        <div className="bg-card rounded-lg shadow-sm border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-gray-900">Active Issues</h3>
-          </div>
-          <div className="divide-y divide-gray-200">
-            {activeIssues.map((issue) => (
-              <IssueCard key={issue.id} issue={issue} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Monitoring Issues */}
-      {monitoringIssues.length > 0 && (
-        <div className="bg-card rounded-lg shadow-sm border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-gray-900">Under Monitoring</h3>
-          </div>
-          <div className="divide-y divide-gray-200">
-            {monitoringIssues.map((issue) => (
-              <IssueCard key={issue.id} issue={issue} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Resolved Issues */}
-      {resolvedIssues.length > 0 && (
-        <div className="bg-card rounded-lg shadow-sm border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-gray-900">Recently Resolved</h3>
-          </div>
-          <div className="divide-y divide-gray-200">
-            {resolvedIssues.map((issue) => (
-              <IssueCard key={issue.id} issue={issue} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Negative Community Feedback */}
+      {/* ── Alert list ── */}
       <div className="bg-card rounded-lg shadow-sm border border-gray-200">
         <div className="p-6 border-b border-gray-200">
-          <h3 className="text-gray-900">Negative Community Feedback</h3>
-          <p className="text-sm text-gray-500 mt-1">
-            AI-classified reports flagged as negative or critical
-          </p>
+          <h3 className="text-gray-900">Active Alerts</h3>
         </div>
-        {loading ? (
-          <div className="p-6">
+
+        <div className="p-6">
+          {loading ? (
+            <AlertSkeleton />
+          ) : alerts.length === 0 ? (
+            <div className="py-16 flex flex-col items-center text-center">
+              <CheckCircle className="w-12 h-12 text-[#2E7D32] mb-4" />
+              <p className="text-gray-700 font-medium text-base">No active alerts detected</p>
+              <p className="text-gray-400 text-sm mt-1">All systems are operating normally</p>
+            </div>
+          ) : (
             <div className="space-y-3">
-              {[1, 2].map((i) => (
-                <div key={i} className="h-16 bg-gray-100 rounded animate-pulse" />
+              {alerts.map((alert, i) => (
+                <AlertCard key={`${alert.type}-${alert.zipCode ?? alert.id ?? i}`} alert={alert} />
               ))}
             </div>
-          </div>
-        ) : negativeFeedback.length === 0 ? (
-          <div className="p-12 text-center">
-            <CheckCircle className="w-10 h-10 text-green-500 mx-auto mb-3" />
-            <p className="text-gray-500">No negative feedback in the system</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-200">
-            {negativeFeedback.map((fb) => (
-              <div key={fb.id} className="p-6 border-l-4 border-red-300 bg-red-50">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-800">{fb.text}</p>
-                    {fb.location && (
-                      <p className="text-xs text-gray-500 mt-2">{fb.location}</p>
-                    )}
-                  </div>
-                  <span className="ml-4 px-3 py-1 rounded-full text-xs text-destructive bg-destructive/10 capitalize shrink-0">
-                    {fb.sentiment}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

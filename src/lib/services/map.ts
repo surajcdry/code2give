@@ -31,8 +31,7 @@ export async function getMapData() {
       AND longitude IS NOT NULL
       AND "resourceStatusId" = 'PUBLISHED'
       AND "resourceTypeId" IN ('FOOD_PANTRY', 'SOUP_KITCHEN', 'COMMUNITY_FRIDGE')
-      AND latitude BETWEEN 40.4 AND 40.95
-      AND longitude BETWEEN -74.3 AND -73.7
+      AND state IN ('NY', 'New York', 'Ny')
     ORDER BY priority DESC NULLS LAST, "subscriberCount" DESC
     LIMIT 500
   `);
@@ -41,8 +40,7 @@ export async function getMapData() {
     pool.query('SELECT * FROM "CensusData"'),
     pool.query(`
       SELECT COUNT(*) FROM "Resource"
-      WHERE latitude BETWEEN 40.4 AND 40.95
-        AND longitude BETWEEN -74.3 AND -73.7
+      WHERE state IN ('NY', 'New York', 'Ny')
         AND "resourceStatusId" = 'PUBLISHED'
         AND "resourceTypeId" IN ('FOOD_PANTRY', 'SOUP_KITCHEN', 'COMMUNITY_FRIDGE')
     `),
