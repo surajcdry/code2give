@@ -45,7 +45,7 @@ export function FoodResourceMapPage() {
 
       {/* Map */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="h-[500px] rounded-lg overflow-hidden">
+        <div className="h-[500px] rounded-lg overflow-hidden isolate">
           {mounted ? (
             <MapContainer center={[40.730610, -73.935242]} zoom={11} scrollWheelZoom={false} style={{ height: "100%", width: "100%" }}>
               <TileLayer

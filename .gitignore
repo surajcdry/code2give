@@ -45,3 +45,4 @@ TEAM.md
 
 postman/*
 .postman/*
+.env.local
