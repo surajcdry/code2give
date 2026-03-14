@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
-import pool from "@/lib/db/pool";
+import { getMapData } from "@/lib/services/map";
 
 export async function GET() {
   try {
-    const pantryResult = await pool.query('SELECT * FROM "Pantry"');
-    const censusResult = await pool.query('SELECT * FROM "CensusData"');
+    const data = await getMapData();
 
     return NextResponse.json({
-      pantries: pantryResult.rows,
-      censusStats: censusResult.rows,
+      pantries: data.pantries,
+      totalPantries: data.totalPantries,
+      censusStats: data.censusStats,
     });
   } catch (error) {
     console.error("Error fetching map data:", error);

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useApp } from "@/components/layout/AppLayout";
 import { KPICard } from "@/components/dashboard/KPICard";
+import { ReportCard, FeedbackReport } from "@/components/dashboard/ReportCard";
 import { GoogleMap, Marker, InfoWindow, Circle } from "@react-google-maps/api";
 import {
   FileText, MapPin, Clock, AlertTriangle,
@@ -14,7 +15,6 @@ import {
 } from "recharts";
 
 type Pantry = { id: string; name: string; latitude: number; longitude: number; hours: string; description: string };
-type FeedbackItem = { id: string; text: string; sentiment: string; tags: string[]; createdAt: string };
 
 const waitTimeTrends = [
   { date: "Mar 6", avgWait: 25, reports: 45 },
@@ -116,10 +116,14 @@ function PantryMapCard({ pantries }: { pantries: Pantry[] }) {
 export function OverviewPage() {
   const { role } = useApp();
   const [pantries, setPantries] = useState<Pantry[]>([]);
-  const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
+  const [totalPantries, setTotalPantries] = useState<number>(0);
+  const [feedback, setFeedback] = useState<FeedbackReport[]>([]);
 
   useEffect(() => {
-    fetch("/api/map-data").then(r => r.json()).then(d => setPantries(d.pantries || []));
+    fetch("/api/map-data").then(r => r.json()).then(d => {
+      setPantries(d.pantries || []);
+      setTotalPantries(d.totalPantries ?? d.pantries?.length ?? 0);
+    });
     fetch("/api/analyze-feedback").then(r => r.json()).then(d => setFeedback(d.feedback || []));
   }, []);
 
@@ -133,7 +137,7 @@ export function OverviewPage() {
         return (
           <>
             <KPICard title="Feedback Processed" value={feedback.length} icon={FileText} trend={{ value: 24, isPositive: true }} />
-            <KPICard title="Active Pantries" value={pantries.length} icon={MapPin} />
+            <KPICard title="Active Pantries" value={totalPantries} icon={MapPin} />
             <KPICard title="Positive Sentiment" value={`${feedback.length > 0 ? Math.round((positive / feedback.length) * 100) : 0}%`} icon={BarChart3} trend={{ value: 8, isPositive: true }} />
             <KPICard title="Needs Attention" value={negative} icon={AlertTriangle} subtitle="Negative feedback" />
           </>
@@ -141,7 +145,7 @@ export function OverviewPage() {
       case "government":
         return (
           <>
-            <KPICard title="Pantries Mapped" value={pantries.length} icon={MapPin} />
+            <KPICard title="Pantries Mapped" value={totalPantries} icon={MapPin} />
             <KPICard title="Demand Growth" value="18%" icon={TrendingUp} trend={{ value: 18, isPositive: true }} />
             <KPICard title="Feedback Reports" value={feedback.length} icon={BarChart3} />
             <KPICard title="Service Gaps" value={issues} icon={AlertTriangle} />
@@ -176,30 +180,21 @@ export function OverviewPage() {
         {/* Pantry Map */}
         <PantryMapCard pantries={pantries} />
 
-        {/* Recent Feedback */}
-        <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="mb-4 text-gray-900">Recent Feedback</h3>
-          <div className="space-y-4">
-            {feedback.slice(0, 4).map((fb) => (
-              <div key={fb.id} className="border-b border-gray-100 pb-3 last:border-0">
-                <div className="flex items-center justify-between mb-1">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    fb.sentiment === "Positive" ? "bg-primary/10 text-primary" :
-                    fb.sentiment === "Negative" ? "bg-destructive/10 text-destructive" :
-                    "bg-gray-100 text-gray-700"
-                  }`}>{fb.sentiment}</span>
-                  <span className="text-xs text-gray-400">
-                    {new Date(fb.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-700 line-clamp-2">{fb.text}</p>
-                <div className="flex gap-1 mt-1 flex-wrap">
-                  {fb.tags?.map((t) => (
-                    <span key={t} className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{t}</span>
-                  ))}
-                </div>
-              </div>
-            ))}
+        <div className="space-y-4">
+          <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-start justify-between">
+              <h3 className="text-gray-900">Recent Reports</h3>
+              <span className="text-xs text-gray-500">Showing latest feedback</span>
+            </div>
+
+            <div className="mt-4 space-y-4 max-h-[520px] overflow-y-auto">
+              {feedback.slice(0, 4).map((fb) => (
+                <ReportCard key={fb.id} report={fb} />
+              ))}
+              {feedback.length === 0 && (
+                <p className="text-sm text-gray-500">No recent reports yet.</p>
+              )}
+            </div>
           </div>
         </div>
       </div>

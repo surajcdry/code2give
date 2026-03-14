@@ -1,9 +1,9 @@
 import { Pool } from "pg";
 
-// Use DIRECT_DATABASE_URL for the raw pg driver.
-// This requires `prisma dev` to be running (it starts the embedded postgres on port 51214).
+// Use DIRECT_URL (direct Supabase connection, bypasses pgbouncer).
+// Falls back to DIRECT_DATABASE_URL for local dev compatibility.
 const pool = new Pool({
-  connectionString: process.env.DIRECT_DATABASE_URL,
+  connectionString: process.env.DIRECT_URL ?? process.env.DIRECT_DATABASE_URL,
 });
 
 export default pool;
