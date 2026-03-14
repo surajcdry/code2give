@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Search, Filter, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import ImageUpload from "@/components/ImageUpload";
 
 type FeedbackItem = {
   id: string; text: string; sentiment: string;
@@ -131,6 +132,13 @@ export function CommunityReportsPage() {
             {isAnalyzing ? "Analyzing..." : "Analyze"}
           </button>
         </form>
+      </div>
+
+      {/* Photo Upload */}
+      <div className="bg-card rounded-lg border-2 border-dashed border-[#2E7D32]/30 p-6">
+        <h3 className="text-gray-900 mb-1">Submit a Pantry Photo</h3>
+        <p className="text-sm text-gray-500 mb-4">Upload a photo to help track pantry availability.</p>
+        <ImageUpload />
       </div>
 
       {/* Grid */}
