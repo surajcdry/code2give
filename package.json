@@ -12,6 +12,7 @@
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@prisma/adapter-neon": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "@react-google-maps/api": "^2.20.8",
     "@types/leaflet": "^1.9.21",
@@ -37,6 +38,7 @@
     "eslint": "^9",
     "eslint-config-next": "^16.1.6",
     "prisma": "^7.5.0",
+    "supabase": "^2.78.1",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
