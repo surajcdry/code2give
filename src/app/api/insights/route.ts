@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db/pool";
 
-// NYC bounding box — includes surrounding metro area (some NJ)
+// NYC state filter — excludes NJ bleed-in from geo bounding box
 const NYC_WHERE = `
-  latitude BETWEEN 40.4 AND 40.95
-  AND longitude BETWEEN -74.3 AND -73.7
+  state IN ('NY', 'New York', 'Ny')
   AND "resourceTypeId" IN ('FOOD_PANTRY', 'SOUP_KITCHEN', 'COMMUNITY_FRIDGE')
 `;
 

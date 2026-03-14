@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { getMapData } from "@/lib/services/map";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const data = await getMapData();
+    const { searchParams } = new URL(request.url);
+    const filter = searchParams.get("filter") ?? "default";
+    const data = await getMapData(filter);
 
     return NextResponse.json({
       pantries: data.pantries,
