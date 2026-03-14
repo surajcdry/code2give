@@ -71,16 +71,16 @@ export default function ImpactMap({
       {/* Map Control Header */}
       <div className="bg-card p-4 border-b border-slate-100 flex items-center justify-between z-10 relative">
         <div>
-          <h3 className="font-semibold text-slate-900">{title}</h3>
-          <p className="text-sm text-primary-foreground0">{subtitle}</p>
+          <h3 className="font-semibold text-foreground text-sm uppercase tracking-wider">{title}</h3>
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
         </div>
 
-        <div className="flex bg-slate-100 p-1 rounded-lg">
+        <div className="flex bg-accent/10 p-1 rounded-md border border-accent/20">
           <Button
             variant={layer === "pantry" ? "default" : "ghost"}
             size="sm"
             onClick={() => setLayer("pantry")}
-            className="rounded-md"
+            className="rounded-sm"
           >
             Pantry Density
           </Button>
@@ -88,7 +88,7 @@ export default function ImpactMap({
             variant={layer === "poverty" ? "default" : "ghost"}
             size="sm"
             onClick={() => setLayer("poverty")}
-            className="rounded-md"
+            className="rounded-sm"
           >
             Poverty SNAP Need
           </Button>

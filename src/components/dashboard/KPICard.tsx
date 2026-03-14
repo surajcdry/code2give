@@ -16,7 +16,7 @@ export function KPICard({ title, value, icon: Icon, trend, subtitle }: KPICardPr
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <p className="text-sm text-gray-600">{title}</p>
-          <p className="text-primaryxl mt-2 text-gray-900">{value}</p>
+          <p className="text-2xl font-bold mt-2 text-gray-900">{value}</p>
           {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
           {trend && (
             <div className="flex items-center gap-1 mt-2">
