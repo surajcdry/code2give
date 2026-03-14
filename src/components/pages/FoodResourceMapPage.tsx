@@ -44,8 +44,8 @@ export function FoodResourceMapPage() {
       </div>
 
       {/* Map */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="h-[500px] rounded-lg overflow-hidden">
+      <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="h-[500px] rounded-lg overflow-hidden isolate">
           {mounted ? (
             <MapContainer center={[40.730610, -73.935242]} zoom={11} scrollWheelZoom={false} style={{ height: "100%", width: "100%" }}>
               <TileLayer
@@ -71,7 +71,7 @@ export function FoodResourceMapPage() {
       </div>
 
       {/* Resource List */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-card rounded-lg shadow-sm border border-gray-200">
         <div className="p-6 border-b border-gray-200">
           <h3 className="text-gray-900">All Pantries ({pantries.length})</h3>
         </div>
@@ -93,7 +93,7 @@ export function FoodResourceMapPage() {
                   </div>
                   {p.description && <p className="text-sm text-gray-500 mt-2">{p.description}</p>}
                 </div>
-                <span className="px-3 py-1 rounded-full text-xs bg-green-100 text-green-800">Active</span>
+                <span className="px-3 py-1 rounded-full text-xs bg-primary/10 text-primary">Active</span>
               </div>
             </div>
           ))}

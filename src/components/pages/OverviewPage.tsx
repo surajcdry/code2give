@@ -96,7 +96,7 @@ export function OverviewPage() {
         </div>
 
         <div className="space-y-4">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex items-start justify-between">
               <h3 className="text-gray-900">Recent Reports</h3>
               <span className="text-xs text-gray-500">Showing latest feedback</span>
@@ -115,7 +115,7 @@ export function OverviewPage() {
       </div>
 
       {/* Trends Chart */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 className="mb-4 text-gray-900">Wait Time & Report Trends</h3>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={waitTimeTrends}>

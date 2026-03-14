@@ -10,7 +10,7 @@ export default function ReliabilityScore() {
   const reliabilityScaled = Math.round(reliabilityRaw * 10); // scale to 100
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col h-full">
+    <div className="rounded-xl border border-border bg-card shadow-sm flex flex-col h-full">
       <div className="p-6 border-b border-slate-100 flex items-center justify-between">
         <h3 className="font-semibold text-lg text-slate-900">InsightEngine AI Analysis</h3>
         <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-2 py-0.5 rounded border border-amber-200">
@@ -47,7 +47,7 @@ export default function ReliabilityScore() {
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-4xl font-bold text-slate-900">{reliabilityScaled}</span>
-              <span className="text-xs text-slate-500 font-medium">/ 100</span>
+              <span className="text-xs text-primary-foreground0 font-medium">/ 100</span>
             </div>
           </div>
           <h4 className="font-bold text-slate-900 mt-4 text-xl">Operating Reliability Score</h4>
@@ -55,18 +55,18 @@ export default function ReliabilityScore() {
 
         <div className="w-full bg-slate-50 rounded-lg p-4 border border-slate-100">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium text-slate-600">Qualitative AI Grade (60% weight)</span>
+            <span className="text-sm font-medium text-muted-foreground">Qualitative AI Grade (60% weight)</span>
             <span className="text-sm font-bold text-slate-900">{avgFeedback}/10</span>
           </div>
-          <div className="w-full bg-slate-200 rounded-full h-1.5 mb-4">
+          <div className="w-full bg-muted rounded-full h-1.5 mb-4">
             <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${avgFeedback * 10}%` }}></div>
           </div>
 
           <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium text-slate-600">Hours Consistency (40% weight)</span>
+            <span className="text-sm font-medium text-muted-foreground">Hours Consistency (40% weight)</span>
             <span className="text-sm font-bold text-slate-900">{consistencyScore}/10</span>
           </div>
-          <div className="w-full bg-slate-200 rounded-full h-1.5">
+          <div className="w-full bg-muted rounded-full h-1.5">
             <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${consistencyScore * 10}%` }}></div>
           </div>
         </div>

@@ -66,8 +66,8 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-3xl font-bold tracking-tight text-slate-900">Lemontree Admin</h2>
-        <div className="flex items-center gap-2 text-sm text-slate-500">
+        <h2 className="text-primaryxl font-bold tracking-tight text-slate-900">Lemontree Admin</h2>
+        <div className="flex items-center gap-2 text-sm text-primary-foreground0">
           <span className="relative flex h-3 w-3">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
@@ -76,36 +76,36 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <p className="text-slate-600 text-lg">
+      <p className="text-muted-foreground text-lg">
         Monitor real-time qualitative feedback analyzed by AI to discover operational bottlenecks.
       </p>
 
       {/* Live Metrics from DB */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="font-medium text-slate-500 mb-1">Feedback Processed</div>
-          <div className="text-3xl font-bold text-slate-900">{stats.total}</div>
-          <div className="text-sm text-slate-500 mt-2">Total in database</div>
+        <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+          <div className="font-medium text-primary-foreground0 mb-1">Feedback Processed</div>
+          <div className="text-primaryxl font-bold text-slate-900">{stats.total}</div>
+          <div className="text-sm text-primary-foreground0 mt-2">Total in database</div>
         </div>
         <div className="rounded-xl border border-green-200 bg-green-50 p-6 shadow-sm">
           <div className="font-medium text-green-700 mb-1">Positive</div>
-          <div className="text-3xl font-bold text-green-900">{stats.positive}</div>
+          <div className="text-primaryxl font-bold text-green-900">{stats.positive}</div>
           <div className="text-sm text-green-600 mt-2">{stats.total > 0 ? Math.round((stats.positive / stats.total) * 100) : 0}% of all feedback</div>
         </div>
         <div className="rounded-xl border border-red-200 bg-red-50 p-6 shadow-sm">
           <div className="font-medium text-red-700 mb-1">Negative</div>
-          <div className="text-3xl font-bold text-red-900">{stats.negative}</div>
+          <div className="text-primaryxl font-bold text-red-900">{stats.negative}</div>
           <div className="text-sm text-red-600 mt-2">{stats.total > 0 ? Math.round((stats.negative / stats.total) * 100) : 0}% of all feedback</div>
         </div>
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
           <div className="font-medium text-amber-800 mb-1">Needs Attention</div>
-          <div className="text-3xl font-bold text-amber-900">2 Pantries</div>
+          <div className="text-primaryxl font-bold text-amber-900">2 Pantries</div>
           <div className="text-sm text-amber-700 mt-2">Reliability score &lt; 50</div>
         </div>
       </div>
 
       {/* Submit New Feedback - THE DEMO KILLER FEATURE */}
-      <div className="rounded-xl border-2 border-dashed border-blue-300 bg-blue-50/50 p-6 shadow-sm">
+      <div className="rounded-xl border-2 border-dashed border-primary/50 bg-primary/5 p-6 shadow-sm">
         <h3 className="font-semibold text-lg text-blue-900 mb-3">🧪 Live AI Demo: Submit Feedback</h3>
         <p className="text-sm text-blue-700 mb-4">Type a real feedback message below and watch the AI categorize it instantly.</p>
         <form onSubmit={handleSubmit} className="flex gap-3">
@@ -114,7 +114,7 @@ export default function AdminDashboard() {
             value={newFeedback}
             onChange={(e) => setNewFeedback(e.target.value)}
             placeholder='Try: "The line was too long and they ran out of milk"'
-            className="flex-1 px-4 py-3 rounded-lg border border-blue-200 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
+            className="flex-1 px-4 py-3 rounded-lg border border-blue-200 bg-card text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent shadow-sm"
             disabled={isAnalyzing}
           />
           <button
@@ -134,12 +134,12 @@ export default function AdminDashboard() {
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Live Feedback Feed */}
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col max-h-[500px]">
+        <div className="rounded-xl border border-border bg-card shadow-sm flex flex-col max-h-[500px]">
           <div className="p-6 border-b border-slate-100 flex items-center justify-between">
             <h3 className="font-semibold text-lg text-slate-900">AI Analyzed Feedback Stream</h3>
             <span className="relative flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
             </span>
           </div>
           <div className="flex-1 p-6 space-y-4 overflow-y-auto">

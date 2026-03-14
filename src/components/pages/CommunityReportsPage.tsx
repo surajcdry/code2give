@@ -17,12 +17,12 @@ function FeedbackCard({ fb }: { fb: FeedbackItem }) {
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+    <div className="bg-card rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
       <div className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           <span className={`text-xs px-2 py-1 rounded-full ${
-            fb.sentiment === "Positive" ? "bg-green-100 text-green-800" :
-            fb.sentiment === "Negative" ? "bg-red-100 text-red-800" :
+            fb.sentiment === "Positive" ? "bg-primary/10 text-primary" :
+            fb.sentiment === "Negative" ? "bg-destructive/10 text-destructive" :
             "bg-gray-100 text-gray-700"
           }`}>{fb.sentiment}</span>
           <div className="flex items-center gap-1 text-xs text-gray-500">
@@ -36,7 +36,7 @@ function FeedbackCard({ fb }: { fb: FeedbackItem }) {
         <div className="flex gap-1.5 flex-wrap">
           {fb.tags?.map((tag) => (
             <span key={tag} className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">
-              <CheckCircle className="w-3 h-3 text-[#2E7D32]" />
+              <CheckCircle className="w-3 h-3 text-primary" />
               {tag}
             </span>
           ))}
@@ -93,14 +93,14 @@ export function CommunityReportsPage() {
               placeholder="Search feedback..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm bg-white text-gray-900 w-64 focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/30"
+              className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm bg-card text-gray-900 w-64 focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/30"
             />
           </div>
           <Filter className="w-5 h-5 text-gray-500" />
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white text-gray-900 focus:outline-none"
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-card text-gray-900 focus:outline-none"
           >
             <option value="all">All Sentiment</option>
             <option value="Positive">Positive</option>
@@ -111,7 +111,7 @@ export function CommunityReportsPage() {
       </div>
 
       {/* AI Submit */}
-      <div className="bg-white rounded-lg border-2 border-dashed border-[#2E7D32]/30 p-6">
+      <div className="bg-card rounded-lg border-2 border-dashed border-[#2E7D32]/30 p-6">
         <h3 className="text-gray-900 mb-1">Submit New Feedback for AI Analysis</h3>
         <p className="text-sm text-gray-500 mb-4">Type a real feedback message and watch the AI categorize it.</p>
         <form onSubmit={handleSubmit} className="flex gap-3">
@@ -121,12 +121,12 @@ export function CommunityReportsPage() {
             onChange={(e) => setNewText(e.target.value)}
             placeholder='Try: "The line was too long and they ran out of milk"'
             disabled={isAnalyzing}
-            className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/30"
+            className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-sm bg-card text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/30"
           />
           <button
             type="submit"
             disabled={isAnalyzing || !newText.trim()}
-            className="px-5 py-2 bg-[#2E7D32] text-white text-sm rounded-lg hover:bg-[#2E7D32]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-5 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isAnalyzing ? "Analyzing..." : "Analyze"}
           </button>
@@ -134,7 +134,7 @@ export function CommunityReportsPage() {
       </div>
 
       {/* Grid */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
         <p className="text-sm text-gray-600 mb-4">Showing {filtered.length} of {feedback.length} reports</p>
         <div className="grid grid-cols-3 gap-6">
           {filtered.map((fb) => <FeedbackCard key={fb.id} fb={fb} />)}

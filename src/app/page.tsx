@@ -7,6 +7,7 @@ import { CommunityReportsPage } from "@/components/pages/CommunityReportsPage";
 import { TrendsPage } from "@/components/pages/TrendsPage";
 import { ServiceIssuesPage } from "@/components/pages/ServiceIssuesPage";
 import { SettingsPage } from "@/components/pages/SettingsPage";
+import { DataTablePage } from "@/components/pages/DataTablePage";
 
 function PageContent() {
   const { page } = useApp();
@@ -22,13 +23,15 @@ function PageContent() {
       return <TrendsPage />;
     case "issues":
       return <ServiceIssuesPage />;
+    case "table":
+      return <DataTablePage />;
     case "settings":
       return <SettingsPage />;
     case "availability":
       return (
         <div className="space-y-6">
           <h1 className="text-gray-900">Food Availability</h1>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-12 text-center">
             <p className="text-gray-500">
               Real-time inventory tracking coming soon. Check the Trends page for weekly availability data.
             </p>
