@@ -49,8 +49,6 @@ model Resource {
   subscriberCount        Int         @default(0)
   priority               Int?
   mergedToResourceId     String?
-  tractId                String?
-  gnnScore               Float?
   contacts               Json        @default("[]")
   images                 Json        @default("[]")
   shifts                 Json        @default("[]")
@@ -63,6 +61,10 @@ model Resource {
   createdAt              DateTime    @default(now())
   updatedAt              DateTime    @updatedAt
   feedback               Feedback[]
+  tractId                String?
+  gnnScore               Float?
+  archetypeId            Int?
+  archetypeName          String?
 }
 
 model Feedback {
@@ -74,6 +76,8 @@ model Feedback {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   resource   Resource? @relation(fields: [resourceId], references: [id])
+  rating     String?
+  waitTimeMinutes Int?
 }
 
 model Pantry {
