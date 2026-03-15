@@ -12,7 +12,7 @@ import {
   ResponsiveContainer, Cell,
 } from "recharts";
 import { useApp } from "@/components/layout/AppLayout";
-import ImageUpload from "@/components/ImageUpload";
+import type { ImageAnalysisResult } from "@/lib/types/imageAnalysis";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,6 +42,8 @@ type CommunityReport = {
   displayName?: string;
   anonymous: boolean;
   avatarSeed: string;
+  tags?: string[];
+  stockLevel?: "low" | "medium" | "high";
 };
 
 type Resource = {
@@ -363,26 +365,44 @@ function BadgeStrip({ count }: { count: number }) {
 
 // ─── ReportCard ───────────────────────────────────────────────────────────────
 
+const STOCK_PILL: Record<string, string> = {
+  high:   "bg-green-100 text-green-700",
+  medium: "bg-amber-100 text-amber-700",
+  low:    "bg-red-100   text-red-700",
+};
+
 function ReportCard({ report }: { report: CommunityReport }) {
   const [hovered, setHovered] = useState(false);
-  const name = report.anonymous ? "Anonymous User" : (report.displayName || "Anonymous User");
+  const name = report.anonymous ? "Anonymous" : (report.displayName || "Anonymous");
   return (
     <div className="flex-shrink-0 w-64 cursor-pointer overflow-hidden"
       onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <div className="h-52 overflow-hidden relative">
+      <div className="h-52 overflow-hidden relative rounded-t-xl">
         <img src={report.imageUrl} alt={report.caption}
           className="w-full h-full object-cover block transition-transform duration-300"
           style={{ transform: hovered ? "scale(1.05)" : "scale(1)" }} />
         <div className="absolute bottom-2.5 left-2.5 bg-black/55 text-white text-[10px] font-medium px-2 py-0.5 rounded">
           {report.createdAt}
         </div>
+        {report.stockLevel && (
+          <div className={`absolute top-2 right-2 text-[9px] font-bold px-2 py-0.5 rounded-full capitalize ${STOCK_PILL[report.stockLevel]}`}>
+            {report.stockLevel} stock
+          </div>
+        )}
       </div>
       <div className="pt-2.5 pb-1.5 flex items-start gap-2">
         <Avatar seed={report.avatarSeed} size={6} />
         <div className="flex-1 min-w-0">
           <p className="text-[11px] font-bold text-gray-900 mb-0.5 truncate">📍 {report.resourceName}</p>
-          <p className="text-[11px] text-gray-500 truncate leading-snug">{report.caption}</p>
-          <p className="text-[10px] text-gray-400 mt-0.5">{name}</p>
+          <p className="text-[11px] text-gray-500 leading-snug line-clamp-2">{report.caption}</p>
+          {report.tags && report.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {report.tags.slice(0, 3).map(tag => (
+                <span key={tag} className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-medium">{tag}</span>
+              ))}
+            </div>
+          )}
+          <p className="text-[10px] text-gray-400 mt-1">{name}</p>
         </div>
       </div>
     </div>
@@ -405,59 +425,229 @@ function ReportFeed({ reports }: { reports: CommunityReport[] }) {
 
 // ─── UploadModal ──────────────────────────────────────────────────────────────
 
+const REPORT_QUESTIONS = [
+  { key: "freshProduce",  label: "Fresh Fruit / Produce", icon: "🥬" },
+  { key: "halal",         label: "Halal Options",          icon: "☪️" },
+  { key: "kosher",        label: "Kosher Options",         icon: "✡️" },
+  { key: "cannedGoods",   label: "Canned Goods",           icon: "🥫" },
+  { key: "dairy",         label: "Dairy",                  icon: "🥛" },
+  { key: "frozen",        label: "Frozen Foods",           icon: "❄️" },
+  { key: "bread",         label: "Bread / Bakery",         icon: "🍞" },
+  { key: "largeVariety",  label: "Large Variety",          icon: "🛒" },
+] as const;
+type QuestionKey = typeof REPORT_QUESTIONS[number]["key"];
+type Answers = Record<QuestionKey, boolean | null>;
+
 function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (data: any) => void }) {
   const [caption, setCaption] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [anon, setAnon] = useState(true);
   const [imgPreview, setImgPreview] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [aiResult, setAiResult] = useState<ImageAnalysisResult | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [answers, setAnswers] = useState<Answers>({
+    freshProduce: null, halal: null, kosher: null, cannedGoods: null,
+    dairy: null, frozen: null, bread: null, largeVariety: null,
+  });
+
+  const handleFileChange = async (f: File) => {
+    setImgPreview(URL.createObjectURL(f));
+    setAiResult(null);
+    setAiError(null);
+    setAnalyzing(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", f);
+      const res = await fetch("/api/analyze-image", { method: "POST", body: fd });
+      if (!res.ok) throw new Error("Analysis failed");
+      const data: ImageAnalysisResult = await res.json();
+      setAiResult(data);
+      const cats = data.categories.map(c => c.toLowerCase());
+      setAnswers(prev => ({
+        ...prev,
+        freshProduce: cats.some(c => ["produce","fresh","fruit","vegetable","vegetables"].some(k => c.includes(k))),
+        cannedGoods:  cats.some(c => c.includes("canned")),
+        dairy:        cats.some(c => c.includes("dairy")),
+        frozen:       cats.some(c => c.includes("frozen")),
+        bread:        cats.some(c => c.includes("bread") || c.includes("bakery")),
+      }));
+    } catch {
+      setAiError("Auto-analysis unavailable — answer the questions manually below.");
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const toggle = (key: QuestionKey, val: boolean) =>
+    setAnswers(prev => ({ ...prev, [key]: prev[key] === val ? null : val }));
+
+  const activeTags = REPORT_QUESTIONS.filter(q => answers[q.key] === true).map(q => q.label);
+
+  const AI_PREFILLED: QuestionKey[] = ["freshProduce", "cannedGoods", "dairy", "frozen", "bread"];
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="flex justify-between items-center mb-5">
-          <h2 className="text-lg font-bold text-gray-900">Share a Report</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="flex justify-between items-center p-6 pb-4 border-b border-gray-100 sticky top-0 bg-white z-10">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Share a Report</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Help your community know what&apos;s available right now</p>
+          </div>
+          <button onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-xl leading-none">✕</button>
         </div>
 
-        <label className="block border-2 border-dashed border-gray-200 rounded-xl overflow-hidden cursor-pointer mb-4 bg-gray-50 min-h-[140px]">
-          <input type="file" accept="image/*" className="hidden"
-            onChange={e => { const f = e.target.files?.[0]; if (f) setImgPreview(URL.createObjectURL(f)); }} />
-          {imgPreview
-            ? <img src={imgPreview} alt="preview" className="w-full max-h-56 object-cover" />
-            : <div className="flex flex-col items-center justify-center h-36 text-gray-400 gap-2">
-                <span className="text-3xl">📷</span>
-                <span className="text-sm">Tap to upload a photo</span>
-              </div>
-          }
-        </label>
+        <div className="p-6 space-y-6">
 
-        <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={3}
-          placeholder="What did you see? (e.g. lots of canned food, fresh produce today…)"
-          className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm resize-none outline-none focus:ring-2 focus:ring-orange-300 text-gray-900 mb-3" />
-
-        <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 mb-3">
+          {/* Photo upload + AI analysis */}
           <div>
-            <p className="text-sm font-semibold text-gray-900">Post anonymously</p>
-            <p className="text-[11px] text-gray-400">Your name won&apos;t be shown</p>
+            <p className="text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+              <Camera className="w-4 h-4 text-purple-500" />
+              Upload a Photo
+              <span className="ml-auto text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">AI-Powered</span>
+            </p>
+            <label className="block border-2 border-dashed border-gray-200 rounded-xl overflow-hidden cursor-pointer bg-gray-50 hover:border-purple-300 hover:bg-purple-50/20 transition-colors">
+              <input type="file" accept="image/*" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleFileChange(f); }} />
+              {imgPreview ? (
+                <div className="relative">
+                  <img src={imgPreview} alt="preview" className="w-full max-h-72 object-cover" />
+                  {analyzing && (
+                    <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-3 text-white">
+                      <svg className="w-7 h-7 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                      </svg>
+                      <p className="text-sm font-semibold">AI is analyzing your photo…</p>
+                      <p className="text-xs text-white/70">Detecting food categories, stock level &amp; crowd</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-44 text-gray-400 gap-3">
+                  <div className="w-16 h-16 rounded-full bg-white border border-gray-200 flex items-center justify-center shadow-sm">
+                    <Camera className="w-7 h-7 text-purple-500" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-semibold text-gray-700">Tap to upload a pantry photo</p>
+                    <p className="text-xs text-gray-400 mt-0.5">AI auto-detects food categories · JPEG, PNG, WebP</p>
+                  </div>
+                </div>
+              )}
+            </label>
+
+            {/* AI result summary bar */}
+            {aiResult && !analyzing && (
+              <div className="mt-3 bg-purple-50 border border-purple-100 rounded-xl px-4 py-3 space-y-2">
+                <div className="flex flex-wrap gap-3 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-semibold text-purple-800">Stock:</span>
+                    <span className={`px-2 py-0.5 rounded-full font-bold capitalize ${
+                      aiResult.stockLevel === "high" ? "bg-green-100 text-green-800" :
+                      aiResult.stockLevel === "low"  ? "bg-red-100   text-red-800"   : "bg-amber-100 text-amber-800"
+                    }`}>{aiResult.stockLevel}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-semibold text-purple-800">Crowd:</span>
+                    <span className={`px-2 py-0.5 rounded-full font-bold capitalize ${
+                      aiResult.crowdLevel === "high" ? "bg-red-100   text-red-800"   :
+                      aiResult.crowdLevel === "low"  ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"
+                    }`}>{aiResult.crowdLevel}</span>
+                  </div>
+                  {aiResult.categories.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-semibold text-purple-800">Detected:</span>
+                      {aiResult.categories.map(c => (
+                        <span key={c} className="bg-white border border-purple-100 text-purple-700 px-2 py-0.5 rounded-full capitalize">{c}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <p className="text-[11px] text-gray-500 italic">{aiResult.summary}</p>
+              </div>
+            )}
+            {aiError && (
+              <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-100 px-3 py-2 rounded-lg">{aiError}</p>
+            )}
           </div>
-          <button onClick={() => setAnon(a => !a)}
-            className="w-10 h-5 rounded-full relative transition-colors duration-200"
-            style={{ background: anon ? "#f97316" : "#e5e7eb" }}>
-            <span className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-200"
-              style={{ left: anon ? "calc(100% - 18px)" : "2px" }} />
+
+          {/* Yes/No checklist */}
+          <div>
+            <p className="text-sm font-semibold text-gray-800 mb-1">What did you see there today?</p>
+            <p className="text-xs text-gray-400 mb-3">
+              Upload a photo and AI pre-fills what it detects — you can adjust manually.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {REPORT_QUESTIONS.map(q => (
+                <div key={q.key} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
+                  <span className="text-sm text-gray-700 flex items-center gap-1.5 truncate mr-2">
+                    <span>{q.icon}</span>
+                    <span className="truncate">{q.label}</span>
+                    {AI_PREFILLED.includes(q.key) && answers[q.key] !== null && (
+                      <span className="text-[9px] bg-purple-100 text-purple-600 px-1.5 rounded shrink-0">AI</span>
+                    )}
+                  </span>
+                  <div className="flex gap-1.5 shrink-0">
+                    <button onClick={() => toggle(q.key, true)}
+                      className={`text-xs font-bold px-2.5 py-1 rounded-lg transition-colors ${
+                        answers[q.key] === true
+                          ? "bg-green-500 text-white"
+                          : "bg-white border border-gray-200 text-gray-500 hover:border-green-400"
+                      }`}>Yes</button>
+                    <button onClick={() => toggle(q.key, false)}
+                      className={`text-xs font-bold px-2.5 py-1 rounded-lg transition-colors ${
+                        answers[q.key] === false
+                          ? "bg-red-400 text-white"
+                          : "bg-white border border-gray-200 text-gray-500 hover:border-red-300"
+                      }`}>No</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Caption */}
+          <div>
+            <p className="text-sm font-semibold text-gray-800 mb-2">Add a note <span className="font-normal text-gray-400">(optional)</span></p>
+            <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={2}
+              placeholder="e.g. Busy today but volunteers were helpful. Lots of produce!"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm resize-none outline-none focus:ring-2 focus:ring-purple-300 text-gray-900" />
+          </div>
+
+          {/* Anonymous toggle */}
+          <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Post anonymously</p>
+              <p className="text-[11px] text-gray-400">Your name won&apos;t be shown</p>
+            </div>
+            <button onClick={() => setAnon(a => !a)}
+              className="w-10 h-5 rounded-full relative transition-colors duration-200"
+              style={{ background: anon ? "#9333ea" : "#e5e7eb" }}>
+              <span className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-200"
+                style={{ left: anon ? "calc(100% - 18px)" : "2px" }} />
+            </button>
+          </div>
+
+          {!anon && (
+            <input value={displayName} onChange={e => setDisplayName(e.target.value)}
+              placeholder="Display name (optional)"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-purple-300 text-gray-900" />
+          )}
+
+          {/* Submit */}
+          <button
+            onClick={() => {
+              onSubmit({ caption, displayName, anon, imgPreview, tags: activeTags, aiResult });
+              onClose();
+            }}
+            className="w-full py-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm transition-colors flex items-center justify-center gap-2">
+            <Upload className="w-4 h-4" />
+            Share Report
           </button>
         </div>
-
-        {!anon && (
-          <input value={displayName} onChange={e => setDisplayName(e.target.value)}
-            placeholder="Display name (optional)"
-            className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-300 text-gray-900 mb-3" />
-        )}
-
-        <button onClick={() => { onSubmit({ caption, displayName, anon, imgPreview }); onClose(); }}
-          className="w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm transition-colors">
-          Share Report
-        </button>
       </div>
     </div>
   );
@@ -734,16 +924,21 @@ export function CommunityHubPage() {
     return feedback;
   }, [feedback, timeFilter, selectedDate]);
 
-  function handleReportSubmit({ caption, displayName, anon, imgPreview }: any) {
+  function handleReportSubmit({ caption, displayName, anon, imgPreview, tags, aiResult }: any) {
+    const autoCaption = aiResult
+      ? `${aiResult.summary} (${aiResult.stockLevel} stock, ${aiResult.crowdLevel} crowd)`
+      : "No caption provided.";
     setReports(prev => [{
       id: Date.now().toString(),
       resourceName: "Your Local Pantry",
       imageUrl: imgPreview || FALLBACK_IMAGES[0],
-      caption: caption || "No caption provided.",
+      caption: caption || autoCaption,
       createdAt: "Just now",
       displayName: anon ? undefined : (displayName || undefined),
       anonymous: anon,
       avatarSeed: Math.random().toString(36).slice(2, 7),
+      tags: tags || [],
+      stockLevel: aiResult?.stockLevel ?? undefined,
     }, ...prev]);
     setUserCount(c => c + 1);
   }
@@ -752,7 +947,7 @@ export function CommunityHubPage() {
 
   if (isClient) {
     return (
-      <div className="max-w-5xl mx-auto space-y-10">
+      <div className="max-w-5xl mx-auto space-y-8">
 
         {/* Welcome banner */}
         <div className="bg-[#FFCC10] rounded-2xl px-8 py-6 flex items-center gap-4">
@@ -760,14 +955,47 @@ export function CommunityHubPage() {
           <div>
             <h1 className="text-xl font-bold text-gray-900">Community Hub</h1>
             <p className="text-sm text-gray-700 mt-0.5">
-              Browse top food resources, see what&apos;s available, and share reports with your community.
+              See what&apos;s available at pantries near you — powered by your community and AI.
             </p>
           </div>
           <button onClick={() => setModalOpen(true)}
             className="ml-auto flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-base px-6 py-3 rounded-xl shadow-md transition-colors shrink-0">
-            <Upload className="w-5 h-5" />
+            <Camera className="w-5 h-5" />
             Add Report
           </button>
+        </div>
+
+        {/* AI feature highlight */}
+        <div className="bg-gradient-to-r from-purple-50 to-purple-100/50 border border-purple-100 rounded-2xl px-6 py-5">
+          <div className="flex flex-wrap items-start gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center shrink-0">
+                <Camera className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-purple-900">AI-Powered Photo Reports</p>
+                <p className="text-xs text-purple-600 mt-0.5">
+                  Snap a pantry photo — our AI instantly identifies what&apos;s in stock and feeds it into the map filters.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-1 sm:mt-0 sm:ml-auto">
+              {[
+                { icon: "🥬", label: "Fresh Produce" },
+                { icon: "☪️", label: "Halal" },
+                { icon: "✡️", label: "Kosher" },
+                { icon: "🥫", label: "Canned Goods" },
+                { icon: "🥛", label: "Dairy" },
+                { icon: "❄️", label: "Frozen" },
+                { icon: "🍞", label: "Bakery" },
+                { icon: "🛒", label: "Large Variety" },
+              ].map(({ icon, label }) => (
+                <span key={label} className="text-xs bg-white border border-purple-200 text-purple-700 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
+                  <span>{icon}</span>{label}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Badges + report feed */}
@@ -794,35 +1022,20 @@ export function CommunityHubPage() {
           )}
         </section>
 
-        {/* Upload + Review */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <Camera className="w-5 h-5 text-primary" />
-              <h2 className="text-lg font-semibold text-gray-900">Upload a Photo</h2>
+        {/* Write a Review — full width */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <MessageSquare className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold text-gray-900">Write a Review</h2>
+          </div>
+          <div className="bg-card rounded-2xl border border-gray-200 p-6 flex flex-col gap-6">
+            <ReviewForm onSubmitted={loadFeedback} />
+            <div>
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Recent Community Reviews</p>
+              <RecentReviews feedback={feedback} />
             </div>
-            <div className="bg-card rounded-2xl border border-gray-200 p-6">
-              <p className="text-sm text-gray-500 mb-4">
-                Help others by sharing photos of available food, the space, or anything useful.
-              </p>
-              <ImageUpload />
-            </div>
-          </section>
-
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <MessageSquare className="w-5 h-5 text-primary" />
-              <h2 className="text-lg font-semibold text-gray-900">Write a Review</h2>
-            </div>
-            <div className="bg-card rounded-2xl border border-gray-200 p-6 flex flex-col gap-6">
-              <ReviewForm onSubmitted={loadFeedback} />
-              <div>
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Recent Community Reviews</p>
-                <RecentReviews feedback={feedback} />
-              </div>
-            </div>
-          </section>
-        </div>
+          </div>
+        </section>
 
         {modalOpen && <UploadModal onClose={() => setModalOpen(false)} onSubmit={handleReportSubmit} />}
       </div>
