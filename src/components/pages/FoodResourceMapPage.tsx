@@ -513,6 +513,7 @@ export function FoodResourceMapPage() {
           zoomControl: true,
           fullscreenControl: false,
           streetViewControl: false,
+          mapTypeControl: false,
           minZoom: MIN_MAP_ZOOM,
         }}
         onLoad={map => { setMapInstance(map); mapRef.current = map; }}
@@ -668,7 +669,7 @@ export function FoodResourceMapPage() {
       )}
 
       {/* ── C. Floating top bar ─────────────────────────────────────────────── */}
-      <div className={`absolute top-3 z-20 right-[190px] transition-all duration-200 ${listOpen ? "left-[332px]" : "left-3"}`}>
+      <div className={`absolute top-3 z-20 right-47.5 transition-all duration-200 ${listOpen ? "left-83" : "left-3"}`}>
         <div className="bg-white/95 backdrop-blur border border-gray-200 rounded-xl shadow-md p-2 space-y-2">
           <div className="flex flex-wrap items-center gap-1.5">
 
