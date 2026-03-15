@@ -68,16 +68,16 @@ model Resource {
 }
 
 model Feedback {
-  id         String    @id @default(cuid())
-  text       String
-  sentiment  String?
-  tags       String[]
-  resourceId String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  resource   Resource? @relation(fields: [resourceId], references: [id])
-  rating     String?
+  id              String    @id @default(cuid())
+  text            String
+  sentiment       String?
+  tags            String[]
+  resourceId      String?
+  resource        Resource? @relation(fields: [resourceId], references: [id])
   waitTimeMinutes Int?
+  rating          Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
 model Pantry {
