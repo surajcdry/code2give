@@ -59,3 +59,5 @@ ml/*.csv
 ml/output/*
 
 .vscode/*
+
+data/CensusData.csv

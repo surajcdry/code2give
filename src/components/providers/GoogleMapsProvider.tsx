@@ -2,7 +2,7 @@
 
 import { LoadScript } from "@react-google-maps/api";
 
-const GOOGLE_MAPS_LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = [];
+const GOOGLE_MAPS_LIBRARIES: ("places" | "geometry" | "drawing")[] = [];
 
 export default function GoogleMapsProvider({ children }: { children: React.ReactNode }) {
   return (
