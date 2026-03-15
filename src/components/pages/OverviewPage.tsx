@@ -61,23 +61,23 @@ const TYPE_COLORS: Record<string, string> = {
 const STATUS_COLORS = { PUBLISHED: "#2E7D32", UNAVAILABLE: "#EF5350" };
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
-
 /**
- * UPDATED: PantryMapCard - Clean CTA design with link to food resource map
+ * UPDATED: PantryMapCard - Professional CTA design with neutral background
  */
 function PantryMapCard() {
   const { setPage } = useApp();
 
   return (
     <div className="col-span-2 bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col group relative transition-all hover:shadow-xl hover:border-primary/40">
-      <div className="absolute top-10 right-10 opacity-[0.03] pointer-events-none group-hover:scale-110 transition-transform duration-700">
+      {/* Background decoration - subtle gray */}
+      <div className="absolute top-10 right-10 opacity-[0.02] pointer-events-none group-hover:scale-105 transition-transform duration-700 text-gray-900">
         <MapPin size={240} strokeWidth={1} />
       </div>
 
-      <div className="flex flex-col items-center justify-center h-full min-h-[320px] p-10 text-center space-y-8 relative z-10">
+      <div className="flex flex-col items-center justify-center h-full min-h-80 p-10 text-center space-y-8 relative z-10">
         <div className="relative">
-          <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full scale-150 animate-pulse" />
-          <div className="bg-primary/10 p-5 rounded-3xl relative">
+          {/* Neutral gray background for the icon instead of purple */}
+          <div className="bg-gray-100 p-5 rounded-3xl relative">
             <MapPin className="w-12 h-12 text-primary" strokeWidth={2.5} />
           </div>
         </div>
@@ -86,32 +86,31 @@ function PantryMapCard() {
           <h2 className="text-4xl font-black text-gray-900 tracking-tighter uppercase">
             Active Pantry <span className="text-primary">Locations</span>
           </h2>
+          <p className="text-gray-500 mt-2 font-medium">Explore the full network of food resources</p>
         </div>
 
         <button 
           onClick={() => setPage("map")} 
-          className="group/btn bg-gray-900 text-[#FFCC10] px-10 py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center gap-3 hover:bg-black transition-all shadow-2xl hover:shadow-primary/40 border border-transparent hover:border-primary/30"
+          className="group/btn bg-gray-900 text-[#FFCC10] px-10 py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center gap-3 hover:bg-black transition-all shadow-lg active:scale-95 border border-transparent"
         >
           <Search className="w-4 h-4" />
           Enter Interactive Map
           <ChevronRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
         </button>
         
-        <p className="text-[11px] text-gray-400 font-medium italic">
-          Click map to enter full interactive resource view
+        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+          Click to enter full resource view
         </p>
       </div>
     </div>
   );
 }
 
-/**
- * UPDATED: StatusCard - Adjusted height and safety guards
- */
+
 function StatusCard({ insights }: { insights: Insights | null }) {
   if (!insights || !insights.summary) {
     return (
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 h-[320px] animate-pulse flex items-center justify-center">
+      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 h-80 animate-pulse flex items-center justify-center">
         <div className="text-gray-300 font-bold uppercase tracking-widest text-xs">Loading Status...</div>
       </div>
     );
@@ -122,7 +121,7 @@ function StatusCard({ insights }: { insights: Insights | null }) {
   const unavailablePct = total > 0 ? Math.round((unavailable / total) * 100) : 0;
 
   return (
-    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 flex flex-col min-h-[320px]">
+    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 flex flex-col min-h-80">
       <div className="mb-2">
         <h3 className="text-gray-900 font-bold text-lg">Resource Status</h3>
         <p className="text-[10px] text-gray-400 uppercase tracking-widest font-black">Live Coverage Breakdown</p>
@@ -387,7 +386,7 @@ function DonorCharts({
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <div className="h-[220px] bg-gray-100 rounded animate-pulse" />
+          <div className="h-55 bg-gray-100 rounded animate-pulse" />
         )}
       </div>
       <div className="grid grid-cols-2 gap-6">
@@ -457,34 +456,44 @@ function GovernmentCharts({
   return (
     <>
       <p className="text-xs text-gray-400 uppercase tracking-wider mb-4 font-bold">Coverage & Equity View</p>
-      <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-        <div className="mb-4">
-          <h3 className="text-gray-900 font-bold">Resource Status by Borough</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Published vs unavailable resources across NYC</p>
+      
+      {/* Combined Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* 1. Resource Status by Borough */}
+        <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-5">
+          <div className="mb-4">
+            <h3 className="text-sm font-bold text-gray-900">Resource Status by Borough</h3>
+            <p className="text-[10px] text-gray-400">Published vs unavailable</p>
+          </div>
+          {trends ? (
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={boroughStatusData} barSize={12} barGap={2}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                <XAxis dataKey="borough" tick={{ fontSize: 9 }} stroke="#9ca3af" />
+                <YAxis tick={{ fontSize: 9 }} stroke="#9ca3af" />
+                <Tooltip contentStyle={{ fontSize: '10px', borderRadius: 8 }} />
+                <Bar dataKey="published" name="Pub" fill="#2E7D32" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="unavailable" name="Unav" fill="#EF5350" radius={[2, 2, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : <div className="h-45 bg-gray-100 rounded animate-pulse" />}
         </div>
-        {trends ? (
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={boroughStatusData} barSize={20} barGap={4}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-              <XAxis dataKey="borough" tick={{ fontSize: 11 }} stroke="#9ca3af" />
-              <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" />
-              <Tooltip
-                formatter={(v, name) => [
-                  `${Number(v ?? 0).toLocaleString()} resources`,
-                  String(name).charAt(0).toUpperCase() + String(name).slice(1),
-                ]}
-                contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb" }}
-              />
-              <Legend />
-              <Bar dataKey="published" name="Published" fill="#2E7D32" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="unavailable" name="Unavailable" fill="#EF5350" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        ) : <div className="h-[240px] bg-gray-100 rounded animate-pulse" />}
-      </div>
-      <div className="grid grid-cols-2 gap-6">
-        <RatingChart data={insights.ratingDistribution} />
-        <WaitTimeChart data={insights.waitTimeDistribution} />
+
+        {/* 2. Rating Distribution */}
+        <RatingChart 
+          data={insights.ratingDistribution} 
+          title="Rating Distribution" 
+          subtitle="Scale 1-5"
+        />
+
+        {/* 3. Wait Time Distribution */}
+        <WaitTimeChart 
+          data={insights.waitTimeDistribution} 
+          title="Wait Time Distribution" 
+          subtitle="Outliers excluded"
+        />
+
       </div>
     </>
   );
@@ -521,7 +530,7 @@ function ProviderCharts({
                 <Bar dataKey="avgRating" fill="#2E7D32" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          ) : <div className="h-[200px] bg-gray-100 rounded animate-pulse" />}
+          ) : <div className="h-50 bg-gray-100 rounded animate-pulse" />}
         </div>
         <TypeBreakdownChart data={insights.typeBreakdown} />
         <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-4">

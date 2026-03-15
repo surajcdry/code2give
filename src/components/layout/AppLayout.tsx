@@ -3,7 +3,8 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import {
   LayoutDashboard, MapPin, FileText, Settings, User, 
-  PanelLeftClose, PanelLeftOpen, Table2, BarChart3, ChevronDown
+  PanelLeftClose, PanelLeftOpen, Table2, BarChart3, ChevronDown,
+  LogOut, ShieldCheck, Heart, Building2, Users
 } from "lucide-react";
 import { ChatBot } from "@/components/TempBot";
 
@@ -27,12 +28,21 @@ const PERMISSIONS: Record<UserRole, PageId[]> = {
   donor: ["overview", "map", "analytics", "table"],
 };
 
+// UPDATED: Order defined here determines dropdown order
 const roleLabels: Record<UserRole, string> = {
   internal: "Lemontree Team",
   client: "Community Member",
   government: "Government Agency",
   donor: "Donor",
   provider: "Food Pantry",
+};
+
+const STARTING_PAGES: Record<UserRole, PageId> = {
+  internal: "overview",
+  client: "map",
+  government: "overview",
+  donor: "overview",
+  provider: "overview",
 };
 
 const navItems: { id: PageId; label: string; icon: React.ElementType }[] = [
@@ -49,6 +59,48 @@ export function useApp() {
   const ctx = useContext(AppContext);
   if (!ctx) throw new Error("useApp must be used within AppLayout");
   return ctx;
+}
+
+// --- LOGIN SCREEN COMPONENT ---
+function LoginScreen({ onLogin }: { onLogin: (role: UserRole) => void }) {
+  const personas: { role: UserRole; icon: React.ElementType; desc: string }[] = [
+    { role: "internal", icon: ShieldCheck, desc: "System Admin & Staff" },
+    { role: "client", icon: Users, desc: "Community Member" },
+    { role: "government", icon: Building2, desc: "City & State Officials" },
+    { role: "donor", icon: Heart, desc: "Philanthropic Partners" },
+    { role: "provider", icon: MapPin, desc: "Pantry & Soup Kitchens" },
+  ];
+
+  return (
+    <div className="min-h-screen bg-[#FFCC10] flex flex-col items-center justify-center p-6 text-gray-900">
+      <div className="mb-12 text-center">
+        <img src="/lemontreeLogo.png" alt="Logo" className="h-20 w-20 mx-auto mb-4" />
+        <h1 className="text-5xl font-black tracking-tighter uppercase">LemonAid</h1>
+        <p className="text-gray-800 font-bold mt-2 uppercase tracking-widest text-xs">Select Persona to Enter</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 max-w-7xl w-full">
+        {personas.map((p) => {
+          const Icon = p.icon;
+          return (
+            <button
+              key={p.role}
+              onClick={() => onLogin(p.role)}
+              className="bg-white p-8 rounded-3xl border-2 border-transparent hover:border-black transition-all shadow-xl hover:-translate-y-2 flex flex-col items-center text-center group"
+            >
+              <div className="bg-gray-100 p-5 rounded-2xl mb-4 group-hover:bg-[#FFCC10] transition-colors">
+                <Icon className="w-8 h-8 text-gray-900" />
+              </div>
+              <h3 className="font-black text-gray-900 uppercase text-sm tracking-tight mb-1">
+                {roleLabels[p.role]}
+              </h3>
+              <p className="text-[10px] text-gray-400 font-bold uppercase">{p.desc}</p>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 // --- SIDEBAR COMPONENT ---
@@ -99,17 +151,25 @@ function Sidebar({ page, setPage, collapsed, setCollapsed, role }: {
 // --- MAIN LAYOUT ---
 export function AppLayout({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<UserRole>("internal");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [page, setPage] = useState<PageId>("overview");
   const [collapsed, setCollapsed] = useState(false);
-  const [open, setOpen] = useState(false);
 
-  const handleRoleChange = (newRole: UserRole) => {
+  const handleLogin = (newRole: UserRole) => {
     setRole(newRole);
-    setOpen(false);
-    if (!PERMISSIONS[newRole].includes(page)) {
-      setPage(PERMISSIONS[newRole][0]);
-    }
+    setIsLoggedIn(true);
+    // Direct link to the persona's specific starting page
+    setPage(STARTING_PAGES[newRole]);
   };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+  };
+
+  // If not logged in, only show the Login Screen
+  if (!isLoggedIn) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
 
   return (
     <AppContext.Provider value={{ role, setRole, page, setPage }}>
@@ -120,15 +180,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <div className="min-h-screen bg-background flex flex-col text-gray-900">
         <header className="fixed top-0 left-0 right-0 h-16 bg-[#FFCC10] z-30 flex items-center px-6">
           
+          {/* TRACK & TEAM TEXT */}
           <div className="flex-1 flex items-center">
-            <div className="flex items-center gap-2.5 px-4 py-1.5 bg-black rounded-full border border-white/10 shadow-lg">
-              <div className="flex gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#FFCC10] animate-pulse" />
-              </div>
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#FFCC10] font-mono whitespace-nowrap">
-                Track B <span className="mx-0.5 text-white/30">/</span> Team 9
-              </span>
-            </div>
+            <span className="text-[12px] font-black uppercase tracking-[0.2em] text-gray-900 font-mono whitespace-nowrap">
+              Track B <span className="mx-2 text-gray-900/30">|</span> Team 9
+            </span>
           </div>
           
           <div className="flex items-center gap-3 shrink-0">
@@ -141,36 +197,21 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </span>
           </div>
 
-          <div className="flex-1 flex justify-end items-center gap-4 relative">
-            <div className="relative">
-              <button
-                onClick={() => setOpen(!open)}
-                className="h-10 flex items-center gap-2 px-4 rounded-lg bg-white/30 hover:bg-white/50 border border-black/10 transition-all shadow-sm"
-              >
-                <User className="w-4 h-4 text-gray-700" />
-                <span className="text-sm font-bold text-gray-900 whitespace-nowrap">{roleLabels[role]}</span>
-                <ChevronDown className="w-4 h-4 text-gray-700" />
-              </button>
-              
-              {open && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-                  <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-20 overflow-hidden text-sm">
-                    {(Object.keys(roleLabels) as UserRole[]).map((r) => (
-                      <button
-                        key={r}
-                        onClick={() => handleRoleChange(r)}
-                        className={`w-full text-left px-4 py-3 transition-colors ${
-                          role === r ? "text-primary font-bold bg-primary/5" : "text-gray-700 hover:bg-gray-50"
-                        }`}
-                      >
-                        {roleLabels[r]}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
+          <div className="flex-1 flex justify-end items-center gap-4">
+            {/* CURRENT ROLE LABEL */}
+            <div className="flex items-center gap-2 bg-white/40 px-4 py-1.5 rounded-xl border border-black/5 shadow-sm">
+              <User className="w-3.5 h-3.5 text-gray-700" />
+              <span className="text-[11px] font-black uppercase tracking-wider text-gray-900">{roleLabels[role]}</span>
             </div>
+
+            {/* LOGOUT BUTTON */}
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-gray-600 hover:text-red-600 hover:bg-red-50 transition-all text-xs font-bold uppercase tracking-tight"
+            >
+              <LogOut size={14} />
+              Logout
+            </button>
 
             <button
               onClick={() => setPage("settings")}
