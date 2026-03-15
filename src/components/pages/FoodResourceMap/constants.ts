@@ -54,17 +54,26 @@ export const ARCHETYPE_COLORS: Record<string, string> = {
 export const ARCHETYPE_DOT_COLORS: Record<number, string> = {
   0: "#6A1B9A",  // Critical Desert
   1: "#C62828",  // Stressed Hub
-  2: "#F9A825",  // Low-Need Isolated
-  3: "#1565C0",  // Urban Core Cluster
-  4: "#2E7D32",  // Well-Served Suburban
+  2: "#F9A825",  // Quietly Underserved
+  3: "#1565C0",  // Dense & Covered
+  4: "#2E7D32",  // Stable & Covered
+};
+
+// Maps DB archetypeName values → user-facing display names
+export const ARCHETYPE_NAME_MAP: Record<string, string> = {
+  "Critical Desert":    "Critical Desert",
+  "Stressed Hub":       "Stressed Hub",
+  "Low-Need Isolated":  "Quietly Underserved",
+  "Urban Core Cluster": "Dense & Covered",
+  "Well-Served Suburban": "Stable & Covered",
 };
 
 export const ARCHETYPE_LEGEND = [
-  { id: 0, label: "Critical Desert",    color: "#6A1B9A" },
-  { id: 1, label: "Stressed Hub",       color: "#C62828" },
-  { id: 2, label: "Low-Need Isolated",  color: "#F9A825" },
-  { id: 3, label: "Urban Core Cluster", color: "#1565C0" },
-  { id: 4, label: "Well-Served Suburban", color: "#2E7D32" },
+  { id: 0, label: "Critical Desert",     color: "#6A1B9A" },
+  { id: 1, label: "Stressed Hub",        color: "#C62828" },
+  { id: 2, label: "Quietly Underserved", color: "#F9A825" },
+  { id: 3, label: "Dense & Covered",     color: "#1565C0" },
+  { id: 4, label: "Stable & Covered",    color: "#2E7D32" },
 ];
 
 export const GAP_COLORS = [
