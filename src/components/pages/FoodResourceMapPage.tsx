@@ -6,12 +6,13 @@ import {
 } from "lucide-react";
 import { GoogleMap, Marker, Circle, InfoWindow } from "@react-google-maps/api";
 import { Button } from "@/components/ui/Button";
+import { useApp } from "@/components/layout/AppLayout";
 import { useEffect, useState, useRef, useCallback } from "react";
 import type { Pantry, SortOption } from "./FoodResourceMap/types";
 import {
   DEFAULT_CENTER, DEFAULT_ZOOM, MIN_FETCH_ZOOM, MIN_MAP_ZOOM, MAX_MARKERS,
   MILES_TO_METERS, RADIUS_OPTIONS, TYPE_LABELS, FOOD_TAGS,
-  SORT_OPTIONS, GAP_COLORS, POVERTY_COLORS, ARCHETYPE_LEGEND, ARCHETYPE_DOT_COLORS,
+  SORT_OPTIONS, GAP_COLORS, POVERTY_COLORS, ARCHETYPE_LEGEND, ARCHETYPE_DOT_COLORS, ARCHETYPE_NAME_MAP,
 } from "./FoodResourceMap/constants";
 import {
   povertyDotColor, distanceMiles, getMarkerIcon, gapFillColor, getZipFromFeature, exportToCSV, ratingColor,
@@ -26,6 +27,8 @@ import { useArchetypePoints } from "./FoodResourceMap/useArchetypePoints";
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export function FoodResourceMapPage() {
+  const { role } = useApp();
+  const canSeeLayers = role === "internal" || role === "government";
   const [allPantries, setAllPantries]         = useState<Pantry[]>([]);
   const [listPantries, setListPantries]       = useState<Pantry[]>([]); // never clears — only updates on first load or click
   const [defaultPantries, setDefaultPantries] = useState<Pantry[]>([]);
@@ -540,7 +543,7 @@ export function FoodResourceMapPage() {
                   <p className="text-xs text-gray-500 mb-1">{p.location}</p>
                   {p.archetypeName && (
                     <span className="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-800 mb-1">
-                      {p.archetypeName}
+                      {ARCHETYPE_NAME_MAP[p.archetypeName] ?? p.archetypeName}
                     </span>
                   )}
                   {p.isOpenNow !== undefined && (
@@ -699,6 +702,7 @@ export function FoodResourceMapPage() {
               <LocateFixed className="w-3.5 h-3.5" /> {gpsLoading ? "Locating…" : "Near Me"}
             </Button>
 
+            {canSeeLayers && (
             <div className="relative">
               <button onClick={() => setLayersOpen(v => !v)}
                 className={`flex items-center gap-2 h-8 px-3 rounded-lg border text-xs font-semibold transition-colors ${
@@ -737,12 +741,13 @@ export function FoodResourceMapPage() {
                         showArchetypeLayer ? "bg-violet-50 border-violet-400 text-violet-900" : "bg-white border-gray-100 text-gray-600 hover:bg-gray-50"
                       }`}>
                       <span className={`w-3 h-3 rounded-sm inline-block border shrink-0 ${showArchetypeLayer ? "bg-violet-600 border-violet-700" : "bg-gray-200 border-gray-300"}`} />
-                      Archetype Layer
+                      Resource Profile Layer
                     </button>
                   </div>
                 </>
               )}
             </div>
+            )}
 
             {searchCenter && (
               <button onClick={handleClearSearch} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
@@ -916,7 +921,7 @@ export function FoodResourceMapPage() {
         {showArchetypeLayer && (
           <>
             <div className="my-2.5 border-t border-gray-200" />
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Resource Archetypes</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Resource Profiles</p>
             {ARCHETYPE_LEGEND.map(({ label, color }) => (
               <div key={label} className="flex items-center gap-2 mb-1.5">
                 <span className="w-3 h-3 rounded-full shrink-0 border border-white shadow-sm" style={{ backgroundColor: color }} />
