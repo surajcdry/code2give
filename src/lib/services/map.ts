@@ -96,6 +96,7 @@ function resourceToPantry(r: LemontreeResource) {
     subscriberCount:       r._count?.resourceSubscriptions ?? null,
     waitTimeMinutesAverage: r.waitTimeMinutesAverage ?? null,
     acceptingNewClients:   r.acceptingNewClients ?? null,
+    imageUrl:              r.images?.[0]?.url ?? null,
     badge,
     badgeColor,
     isPublished:           true,
