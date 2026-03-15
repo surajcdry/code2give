@@ -1,5 +1,8 @@
 "use client";
 
+
+
+
 import { useEffect, useRef, useState } from "react";
 import {
   ChevronUp,
@@ -8,12 +11,17 @@ import {
   ExternalLink,
   MessageSquare,
   Database,
-  AlertTriangle,
-  AlertCircle,
-  Filter,
+  Download,
 } from "lucide-react";
+import { downloadFullReport } from "@/utils/exportReport";
+
+
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+
+
 
 interface Alert {
   type: string;
@@ -21,6 +29,9 @@ interface Alert {
   title: string;
   description: string;
 }
+
+
+
 
 type Resource = {
   id: string;
@@ -43,15 +54,20 @@ type Resource = {
   schedule: string;
   latitude: number | null;
   longitude: number | null;
-  // Merged Service info
   activeAlerts?: Alert[];
 };
+
+
+
 
 type MetaType = {
   id: string;
   name: string;
   count: number;
 };
+
+
+
 
 type FeedbackItem = {
   id: string;
@@ -61,10 +77,19 @@ type FeedbackItem = {
   createdAt: string;
 };
 
+
+
+
 type Tab = "resources" | "feedback";
 type SortDir = "asc" | "desc";
 
+
+
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+
+
 
 function typeBadge(typeId: string | null): string {
   const map: Record<string, string> = {
@@ -77,6 +102,9 @@ function typeBadge(typeId: string | null): string {
   return map[typeId ?? ""] ?? "bg-gray-100 text-gray-600";
 }
 
+
+
+
 function ratingColor(rating: number | null): string {
   if (rating === null) return "text-gray-400";
   if (rating >= 2.5) return "text-green-600";
@@ -84,11 +112,17 @@ function ratingColor(rating: number | null): string {
   return "text-red-600";
 }
 
+
+
+
 function sentimentColor(s: string): string {
   if (s === "Positive") return "bg-green-100 text-green-800";
   if (s === "Negative") return "bg-red-100 text-red-800";
   return "bg-gray-100 text-gray-700";
 }
+
+
+
 
 function timeAgo(ts: string): string {
   const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
@@ -97,36 +131,21 @@ function timeAgo(ts: string): string {
   return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+
+
+
 function formatNumber(n: number | null): string {
   if (n === null || n === undefined) return "—";
   return n.toLocaleString();
 }
 
+
+
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function IssueBadge({ alerts }: { alerts: Alert[] }) {
-  if (!alerts || alerts.length === 0) return <span className="text-gray-300">—</span>;
-  const highSeverity = alerts.some(a => a.severity === "high");
-  
-  return (
-    <div className="flex items-center gap-1 group relative cursor-help">
-      {highSeverity ? (
-        <AlertTriangle className="w-4 h-4 text-red-500 fill-red-50" />
-      ) : (
-        <AlertCircle className="w-4 h-4 text-yellow-500" />
-      )}
-      <span className={`text-xs font-bold ${highSeverity ? 'text-red-600' : 'text-yellow-700'}`}>
-        {alerts.length}
-      </span>
-      {/* Tooltip */}
-      <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-50 bg-gray-900 text-white text-[10px] p-2 rounded shadow-xl whitespace-nowrap">
-        {alerts.map((a, i) => (
-          <div key={i} className="mb-1 last:mb-0">• {a.title}</div>
-        ))}
-      </div>
-    </div>
-  );
-}
+
+
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   if (!active) return <ChevronUp className="w-3 h-3 text-gray-300" />;
@@ -136,6 +155,9 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
     <ChevronDown className="w-3 h-3 text-[#2E7D32]" />
   );
 }
+
+
+
 
 function SkeletonRows({ cols }: { cols: number }) {
   return (
@@ -153,29 +175,49 @@ function SkeletonRows({ cols }: { cols: number }) {
   );
 }
 
+
+
+
 // ─── Main Component ───────────────────────────────────────────────────────────
+
+
+
 
 export function DataTablePage() {
   const [tab, setTab] = useState<Tab>("resources");
+
+
+
 
   const [resources, setResources] = useState<Resource[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
 
+
+
+
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "PUBLISHED" | "UNAVAILABLE">("all");
-  const [showIssuesOnly, setShowIssuesOnly] = useState(false); // Flag Filter
   const [sortBy, setSortBy] = useState("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
 
+
+
+
   const [types, setTypes] = useState<MetaType[]>([]);
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
 
+
+
+
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+
+
 
   useEffect(() => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
@@ -186,11 +228,17 @@ export function DataTablePage() {
     return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); };
   }, [search]);
 
+
+
+
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return; }
     setPage(1);
-  }, [typeFilter, statusFilter, sortBy, sortDir, showIssuesOnly]);
+  }, [typeFilter, statusFilter, sortBy, sortDir]);
+
+
+
 
   useEffect(() => {
     fetch("/api/resources?meta=true")
@@ -199,12 +247,18 @@ export function DataTablePage() {
       .catch(console.error);
   }, []);
 
+
+
+
   useEffect(() => {
     fetch("/api/analyze-feedback")
       .then((r) => r.json())
       .then((data) => { setFeedback(data.feedback || []); })
       .catch(console.error);
   }, []);
+
+
+
 
   useEffect(() => {
     setLoading(true);
@@ -213,9 +267,11 @@ export function DataTablePage() {
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (typeFilter !== "all") params.set("type", typeFilter);
     if (statusFilter !== "all") params.set("status", statusFilter);
-    if (showIssuesOnly) params.set("hasIssues", "true");
     params.set("sortBy", sortBy);
     params.set("sortDir", sortDir);
+
+
+
 
     fetch(`/api/resources?${params.toString()}`)
       .then((r) => r.json())
@@ -229,7 +285,10 @@ export function DataTablePage() {
         console.error(err);
         setLoading(false);
       });
-  }, [page, debouncedSearch, typeFilter, statusFilter, sortBy, sortDir, showIssuesOnly]);
+  }, [page, debouncedSearch, typeFilter, statusFilter, sortBy, sortDir]);
+
+
+
 
   function toggleSort(key: string) {
     if (sortBy === key) {
@@ -239,6 +298,9 @@ export function DataTablePage() {
       setSortDir("asc");
     }
   }
+
+
+
 
   function ThBtn({ label, colKey }: { label: string; colKey: string }) {
     return (
@@ -254,32 +316,36 @@ export function DataTablePage() {
     );
   }
 
+
+
+
   const startItem = total === 0 ? 0 : (page - 1) * 20 + 1;
   const endItem = Math.min(page * 20, total);
 
+
+
+
   return (
-    <div className="space-y-6">
+    <div id="data-table-report" className="space-y-6 bg-white p-2">
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">Data Table</h2>
           <p className="text-sm text-gray-500 mt-1">Operational view with inline service alerts</p>
         </div>
-        
-        {/* NEW Toggle for Service Issues */}
-        {tab === "resources" && (
+       
+        <div className="flex gap-2">
           <button
-            onClick={() => setShowIssuesOnly(!showIssuesOnly)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-              showIssuesOnly 
-                ? "bg-red-50 border-red-200 text-red-700 shadow-sm" 
-                : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-            }`}
+            onClick={() => downloadFullReport(tab === "resources" ? resources : feedback, tab)}
+            className="flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-semibold bg-[#FFCC10] text-[#856404] hover:bg-[#F9A825] hover:text-[#705203] transition-all shadow-sm active:scale-95 group border border-[#FFCC10]/10"
           >
-            <AlertTriangle className={`w-4 h-4 ${showIssuesOnly ? 'text-red-600' : 'text-gray-400'}`} />
-            {showIssuesOnly ? "Showing Flagged Only" : "Filter Flagged Items"}
+            <Download size={14} className="group-hover:translate-y-0.5 transition-transform" />
+            Export Report
           </button>
-        )}
+        </div>
       </div>
+
+
+
 
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
@@ -297,34 +363,49 @@ export function DataTablePage() {
           </button>
         </div>
 
-        <div className="relative">
+
+
+
+        <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
             placeholder="Search..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/30 w-56"
+            className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/30"
           />
         </div>
       </div>
 
+
+
+
       {tab === "resources" && (
-        <div className="flex items-center gap-3 flex-wrap">
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white">
+        <div className="flex items-center gap-3">
+          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="flex-1 min-w-[200px] max-w-sm text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white">
             <option value="all">All Types</option>
             {types.map((t) => ( <option key={t.id} value={t.id}>{t.name} ({t.count.toLocaleString()})</option> ))}
           </select>
 
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white">
+
+
+
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="flex-1 min-w-[150px] max-w-xs text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white">
             <option value="all">All Status</option>
             <option value="PUBLISHED">Published</option>
             <option value="UNAVAILABLE">Unavailable</option>
           </select>
 
+
+
+
           {!loading && ( <span className="text-xs text-gray-400 ml-auto">Showing {startItem.toLocaleString()}–{endItem.toLocaleString()} of {total.toLocaleString()} resources</span> )}
         </div>
       )}
+
+
+
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
         {tab === "resources" ? (
@@ -332,7 +413,6 @@ export function DataTablePage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">Issues</th>
                   <ThBtn label="Name" colKey="name" />
                   <ThBtn label="City" colKey="city" />
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Zip</th>
@@ -345,13 +425,12 @@ export function DataTablePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {loading ? ( <SkeletonRows cols={11} /> ) : resources.length === 0 ? (
-                  <tr><td colSpan={11} className="px-4 py-12 text-center text-gray-400">No resources found</td></tr>
+                {loading ? ( <SkeletonRows cols={9} /> ) : resources.length === 0 ? (
+                  <tr><td colSpan={9} className="px-4 py-12 text-center text-gray-400">No resources found</td></tr>
                 ) : (
                   resources.map((r) => (
                     <tr key={r.id} className={`hover:bg-gray-50 transition-colors ${r.activeAlerts?.length ? 'bg-red-50/20' : ''}`}>
-                      <td className="px-4 py-3"><IssueBadge alerts={r.activeAlerts || []} /></td>
-                      <td className="px-4 py-3 max-w-[180px]"><div className="text-sm font-medium text-gray-900 truncate">{r.name}</div></td>
+                      <td className="px-4 py-3 max-w-[200px]"><div className="text-sm font-medium text-gray-900 truncate">{r.name}</div></td>
                       <td className="px-4 py-3 text-sm text-gray-600">{r.city || "—"}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{r.zipCode || "—"}</td>
                       <td className="px-4 py-3"><span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${r.status === 'PUBLISHED' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{r.status || '—'}</span></td>
@@ -391,8 +470,7 @@ export function DataTablePage() {
           </div>
         )}
       </div>
-      
-      {/* Pagination component logic stays same as your original */}
+     
       {!loading && total > 0 && tab === "resources" && (
         <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
            <span className="text-xs text-gray-400">Page {page} of {totalPages}</span>
@@ -405,3 +483,10 @@ export function DataTablePage() {
     </div>
   );
 }
+
+
+
+
+
+
+
