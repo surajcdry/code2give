@@ -37,6 +37,14 @@ const roleLabels: Record<UserRole, string> = {
   provider: "Food Pantry",
 };
 
+const STARTING_PAGES: Record<UserRole, PageId> = {
+  internal: "overview",
+  client: "map",
+  government: "overview",
+  donor: "overview",
+  provider: "overview",
+};
+
 const navItems: { id: PageId; label: string; icon: React.ElementType }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "map", label: "Food Resource Map", icon: MapPin },

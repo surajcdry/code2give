@@ -74,7 +74,7 @@ function PantryMapCard() {
         <MapPin size={240} strokeWidth={1} />
       </div>
 
-      <div className="flex flex-col items-center justify-center h-full min-h-[320px] p-10 text-center space-y-8 relative z-10">
+      <div className="flex flex-col items-center justify-center h-full min-h-80 p-10 text-center space-y-8 relative z-10">
         <div className="relative">
           {/* Neutral gray background for the icon instead of purple */}
           <div className="bg-gray-100 p-5 rounded-3xl relative">
@@ -110,7 +110,7 @@ function PantryMapCard() {
 function StatusCard({ insights }: { insights: Insights | null }) {
   if (!insights || !insights.summary) {
     return (
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 h-[320px] animate-pulse flex items-center justify-center">
+      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 h-80 animate-pulse flex items-center justify-center">
         <div className="text-gray-300 font-bold uppercase tracking-widest text-xs">Loading Status...</div>
       </div>
     );
@@ -121,7 +121,7 @@ function StatusCard({ insights }: { insights: Insights | null }) {
   const unavailablePct = total > 0 ? Math.round((unavailable / total) * 100) : 0;
 
   return (
-    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 flex flex-col min-h-[320px]">
+    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 flex flex-col min-h-80">
       <div className="mb-2">
         <h3 className="text-gray-900 font-bold text-lg">Resource Status</h3>
         <p className="text-[10px] text-gray-400 uppercase tracking-widest font-black">Live Coverage Breakdown</p>
@@ -386,7 +386,7 @@ function DonorCharts({
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <div className="h-[220px] bg-gray-100 rounded animate-pulse" />
+          <div className="h-55 bg-gray-100 rounded animate-pulse" />
         )}
       </div>
       <div className="grid grid-cols-2 gap-6">
@@ -477,7 +477,7 @@ function GovernmentCharts({
                 <Bar dataKey="unavailable" name="Unav" fill="#EF5350" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          ) : <div className="h-[180px] bg-gray-100 rounded animate-pulse" />}
+          ) : <div className="h-45 bg-gray-100 rounded animate-pulse" />}
         </div>
 
         {/* 2. Rating Distribution */}
@@ -530,7 +530,7 @@ function ProviderCharts({
                 <Bar dataKey="avgRating" fill="#2E7D32" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          ) : <div className="h-[200px] bg-gray-100 rounded animate-pulse" />}
+          ) : <div className="h-50 bg-gray-100 rounded animate-pulse" />}
         </div>
         <TypeBreakdownChart data={insights.typeBreakdown} />
         <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-4">
