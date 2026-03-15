@@ -566,15 +566,13 @@ function KPIs({ role, insights }: { role: string | undefined; insights: any }) {
     return <div className="col-span-4 h-24 bg-gray-50 rounded-lg animate-pulse" />;
   }
   const { summary } = insights;
-  const total = summary.total || 0;
-  const unavailable = summary.unavailable || 0;
-  const gap = total > 0 ? Math.round((unavailable / total) * 100) : 0;
+  const gap = Math.round((summary.unavailable / summary.total) * 100);
 
   const governmentKPIs = [
-    { title: "Total Resources Mapped", value: total.toLocaleString(), icon: MapPin, subtitle: "NYC Metro area" },
-    { title: "Service Gaps", value: `${gap}%`, icon: TrendingDown, subtitle: `${unavailable.toLocaleString()} unavailable` },
-    { title: "Avg Community Rating", value: (summary.avgRating || 0).toFixed(2), icon: BarChart3, subtitle: "Out of 5.0" },
-    { title: "Engagement", value: (summary.hasSubscribers || 0).toLocaleString(), icon: Users, subtitle: "Active followers" },
+    { title: "Total Resources Mapped", value: summary.total.toLocaleString(), icon: MapPin, subtitle: "NYC Metro area" },
+    { title: "Service Gaps", value: `${gap}%`, icon: TrendingDown, subtitle: `${summary.unavailable.toLocaleString()} unavailable` },
+    { title: "Avg Community Rating", value: summary.avgRating.toFixed(2), icon: BarChart3, subtitle: "Out of 5.0" },
+    { title: "Engagement", value: summary.hasSubscribers.toLocaleString(), icon: Users, subtitle: "Active followers" },
   ];
 
   const defaultKPIs = [

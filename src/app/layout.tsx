@@ -4,7 +4,7 @@ import GoogleMapsProvider from "@/components/providers/GoogleMapsProvider";
 import { ChatBot } from "@/components/TempBot";
 
 export const metadata: Metadata = {
-  title: "Lemontree InsightEngine",
+  title: "Lemon-Aid",
   description: "Food insecurity data intelligence platform — Morgan Stanley Code to Give 2026",
 };
 

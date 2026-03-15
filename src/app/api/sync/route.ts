@@ -41,7 +41,7 @@ export async function POST() {
             (await prisma.resource.findMany({
                 where: { syncedAt: { gte: oneDayAgo } },
                 select: { id: true },
-            })).map((r) => r.id)
+            })).map((r: { id: string }) => r.id)
         );
 
         for await (const r of fetchAllResources()) {

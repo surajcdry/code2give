@@ -73,11 +73,11 @@ function Sidebar({ page, setPage, collapsed, setCollapsed, role }: {
               <button
                 key={item.id}
                 onClick={() => setPage(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-left ${
+                className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-left ${
                   collapsed ? "justify-center" : ""
                 } ${isActive ? "bg-primary/10 text-primary font-semibold" : "text-gray-700 hover:bg-gray-100"}`}
               >
-                <Icon className="w-5 h-5 shrink-0" />
+                <Icon className="w-4 h-4 shrink-0" />
                 {!collapsed && <span className="text-sm">{item.label}</span>}
               </button>
             );
@@ -186,7 +186,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <Sidebar page={page} setPage={setPage} collapsed={collapsed} setCollapsed={setCollapsed} role={role} />
         
         <main className={`${collapsed ? "ml-16" : "ml-64"} pt-16 transition-all duration-300`}>
-          <div className="p-8">
+          <div className={page === "map" ? "" : "p-8"}>
             {children}
           </div>
         </main>
