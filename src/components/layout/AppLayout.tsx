@@ -5,6 +5,7 @@ import {
   LayoutDashboard, MapPin, FileText, Settings, User, 
   PanelLeftClose, PanelLeftOpen, Table2, BarChart3, ChevronDown
 } from "lucide-react";
+import { ChatBot } from "@/components/TempBot";
 
 // --- TYPES ---
 export type UserRole = "internal" | "client" | "government" | "donor" | "provider";
@@ -26,7 +27,6 @@ const PERMISSIONS: Record<UserRole, PageId[]> = {
   donor: ["overview", "map", "analytics", "table"],
 };
 
-// UPDATED: Order defined here determines dropdown order
 const roleLabels: Record<UserRole, string> = {
   internal: "Lemontree Team",
   client: "Community Member",
@@ -190,6 +190,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
             {children}
           </div>
         </main>
+
+        <ChatBot />
       </div>
     </AppContext.Provider>
   );
