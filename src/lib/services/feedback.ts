@@ -11,6 +11,8 @@ export async function saveFeedback(text: string, sentiment: string, tags: string
 }
 
 export async function getRecentFeedback() {
-  const result = await pool.query('SELECT * FROM "Feedback" ORDER BY "createdAt" DESC LIMIT 20');
+  const result = await pool.query(
+    'SELECT id, text, sentiment, tags, "createdAt" FROM "Feedback" ORDER BY "createdAt" DESC LIMIT 20'
+  );
   return result.rows;
 }

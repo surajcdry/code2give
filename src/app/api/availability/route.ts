@@ -1,5 +1,8 @@
 import pool from "@/lib/db/pool";
 import { NextResponse } from "next/server";
+import { cached } from "@/lib/cache";
+
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 const DAYS_MAP: Record<string, string> = {
   MO: "Monday",
@@ -63,6 +66,7 @@ function extractDaysFromShifts(shifts: unknown[]): string[] {
 
 export async function GET() {
   try {
+    const body = await cached("availability", CACHE_TTL, async () => {
     const result = await pool.query(`
       SELECT
         id,
@@ -141,7 +145,12 @@ export async function GET() {
       ...heatmapMap[borough],
     }));
 
-    return NextResponse.json({ heatmap, openToday, summary });
+    return { heatmap, openToday, summary };
+    }); // end cached
+
+    return NextResponse.json(body, {
+      headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=60" },
+    });
   } catch (error) {
     console.error("Error fetching availability data:", error);
     return NextResponse.json({ error: "Failed to fetch availability data" }, { status: 500 });

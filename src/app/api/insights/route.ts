@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db/pool";
+import { cached } from "@/lib/cache";
 
 // NYC state filter — excludes NJ bleed-in from geo bounding box
 const NYC_WHERE = `
@@ -7,8 +8,11 @@ const NYC_WHERE = `
   AND "resourceTypeId" IN ('FOOD_PANTRY', 'SOUP_KITCHEN', 'COMMUNITY_FRIDGE')
 `;
 
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 export async function GET() {
   try {
+    const body = await cached("insights", CACHE_TTL, async () => {
     const [
       countsResult,
       typeBreakdownResult,
@@ -155,7 +159,7 @@ export async function GET() {
 
     const counts = countsResult.rows[0];
 
-    return NextResponse.json({
+    return {
       summary: {
         total: parseInt(counts.total),
         published: parseInt(counts.published),
@@ -204,6 +208,11 @@ export async function GET() {
         zip: r.zipCode,
         count: parseInt(r.count),
       })),
+    };
+    }); // end cached
+
+    return NextResponse.json(body, {
+      headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=60" },
     });
   } catch (error) {
     console.error("Insights error:", error);

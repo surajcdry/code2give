@@ -1,5 +1,8 @@
 import pool from "@/lib/db/pool";
 import { NextResponse } from "next/server";
+import { cached } from "@/lib/cache";
+
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 const BOROUGH_CASE = `
   CASE
@@ -13,6 +16,7 @@ const BOROUGH_CASE = `
 
 export async function GET() {
   try {
+    const body = await cached("trends", CACHE_TTL, async () => {
     const [boroughsResult, quadrantResult, topEngagedResult, resourceTypesResult] =
       await Promise.all([
         pool.query(`
@@ -92,13 +96,17 @@ export async function GET() {
       count: Number(row.count),
     }));
 
-    return NextResponse.json({
+    return {
       boroughs,
       quadrant: quadrantResult.rows,
       topEngaged: topEngagedResult.rows,
       resourceTypes,
-    });
-  } catch (error) {
+    };
+    }); // end cached
+
+    return NextResponse.json(body, {
+      headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=60" },
+    });  } catch (error) {
     console.error("Error fetching trends data:", error);
     return NextResponse.json({ error: "Failed to fetch trends data" }, { status: 500 });
   }

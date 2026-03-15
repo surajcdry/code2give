@@ -51,7 +51,7 @@ export async function GET(request: Request) {
     }
 
     const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-    const sql = `SELECT * FROM \"Feedback\" ${whereClause} ORDER BY \"${sortField}\" ${sortDir} LIMIT $${idx}`;
+    const sql = `SELECT id, text, sentiment, tags, "createdAt" FROM "Feedback" ${whereClause} ORDER BY "${sortField}" ${sortDir} LIMIT $${idx}`;
     values.push(limit);
 
     const result = await pool.query(sql, values);

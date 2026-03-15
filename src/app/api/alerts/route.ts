@@ -1,5 +1,8 @@
 import pool from "@/lib/db/pool";
 import { NextResponse } from "next/server";
+import { cached } from "@/lib/cache";
+
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 const BOROUGHS = ["Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"];
 
@@ -23,44 +26,9 @@ interface Alert {
   id?: string;
 }
 
-function extractSundayCoveringBoroughs(rows: Array<{ shifts: unknown; borough: string }>): Set<string> {
-  const sundayBoroughs = new Set<string>();
-
-  for (const row of rows) {
-    let shifts: unknown[] = [];
-    if (row.shifts) {
-      try {
-        shifts = typeof row.shifts === "string" ? JSON.parse(row.shifts) : row.shifts;
-      } catch {
-        shifts = [];
-      }
-    }
-
-    if (!Array.isArray(shifts) || shifts.length === 0) continue;
-
-    for (const shift of shifts) {
-      if (!shift || typeof shift !== "object") continue;
-      const recurrence = (shift as Record<string, unknown>).recurrencePattern;
-      if (!recurrence || typeof recurrence !== "string") continue;
-
-      const bydayMatch = recurrence.match(/BYDAY=([^;\n\r]+)/);
-      if (!bydayMatch) continue;
-
-      const codes = bydayMatch[1].split(",");
-      for (const code of codes) {
-        const cleaned = code.trim().replace(/^-?\d+/, "");
-        if (cleaned === "SU") {
-          sundayBoroughs.add(row.borough);
-        }
-      }
-    }
-  }
-
-  return sundayBoroughs;
-}
-
 export async function GET() {
   try {
+    const body = await cached("alerts", CACHE_TTL, async () => {
     const [
       unavailabilityResult,
       lowRatedResult,
@@ -116,14 +84,15 @@ export async function GET() {
           AND "resourceStatusId" = 'PUBLISHED'
       `),
 
-      // Alert 4: No Sunday Coverage — fetch all published NYC resources with shifts
+      // Alert 4: No Sunday Coverage — check in SQL to avoid pulling all shifts JSON
       pool.query(`
-        SELECT
-          shifts,
+        SELECT DISTINCT
           ${BOROUGH_CASE} AS borough
-        FROM "Resource"
+        FROM "Resource",
+          LATERAL jsonb_array_elements(shifts::jsonb) AS shift
         WHERE state IN ('NY', 'New York', 'Ny')
           AND "resourceStatusId" = 'PUBLISHED'
+          AND shift->>'recurrencePattern' LIKE '%SU%'
       `),
     ]);
 
@@ -177,7 +146,7 @@ export async function GET() {
     }
 
     // Alert 4: No Sunday Coverage Boroughs
-    const sundayCoveredBoroughs = extractSundayCoveringBoroughs(shiftsResult.rows);
+    const sundayCoveredBoroughs = new Set(shiftsResult.rows.map((r: { borough: string }) => r.borough));
     for (const borough of BOROUGHS) {
       if (!sundayCoveredBoroughs.has(borough)) {
         alerts.push({
@@ -194,8 +163,12 @@ export async function GET() {
     const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
     alerts.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
 
-    return NextResponse.json({ alerts });
-  } catch (error) {
+    return { alerts };
+    }); // end cached
+
+    return NextResponse.json(body, {
+      headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=60" },
+    });  } catch (error) {
     console.error("Error fetching alerts data:", error);
     return NextResponse.json({ error: "Failed to fetch alerts data" }, { status: 500 });
   }

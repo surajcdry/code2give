@@ -22,7 +22,7 @@ export default function ImpactMap() {
   const [selectedMarker, setSelectedMarker] = useState<Pantry | null>(null);
 
   useEffect(() => {
-    fetch('/api/map-data')
+    fetch('/api/map-data?north=40.92&south=40.49&east=-73.70&west=-74.26')
       .then(res => res.json())
       .then(data => {
         if (data.pantries) setPantries(data.pantries);
@@ -31,7 +31,7 @@ export default function ImpactMap() {
   }, []);
 
   return (
-    <div className="rounded-xl border border-border overflow-hidden shadow-sm flex flex-col h-[500px]">
+    <div className="rounded-xl border border-border overflow-hidden shadow-sm flex flex-col h-125">
       {/* Map Control Header */}
       <div className="bg-card p-4 border-b border-slate-100 flex items-center justify-between z-10 relative">
         <div>

@@ -1,5 +1,8 @@
 import pool from "@/lib/db/pool";
 import { NextResponse } from "next/server";
+import { cached } from "@/lib/cache";
+
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 interface ShiftRow {
   recurrencePattern?: string | null;
@@ -60,6 +63,7 @@ function getBadge(score: number): { badge: string; color: string } {
 
 export async function GET() {
   try {
+    const body = await cached("reliability", CACHE_TTL, async () => {
     const result = await pool.query(`
       SELECT
         id,
@@ -156,7 +160,7 @@ export async function GET() {
       count,
     }));
 
-    return NextResponse.json({
+    return {
       resources,
       summary: {
         excellent,
@@ -165,6 +169,11 @@ export async function GET() {
         avgScore,
         histogram,
       },
+    };
+    }); // end cached
+
+    return NextResponse.json(body, {
+      headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=60" },
     });
   } catch (error) {
     console.error(error);

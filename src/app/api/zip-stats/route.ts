@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db/pool";
+import { cached } from "@/lib/cache";
+
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export async function GET() {
   try {
+    const body = await cached("zip-stats", CACHE_TTL, async () => {
     const result = await pool.query(`
       SELECT
         "zipCode",
@@ -33,7 +37,12 @@ export async function GET() {
       };
     }
 
-    return NextResponse.json({ zipStats });
+    return { zipStats };
+    }); // end cached
+
+    return NextResponse.json(body, {
+      headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=60" },
+    });
   } catch (error) {
     console.error("zip-stats error:", error);
     return NextResponse.json({ zipStats: {} }, { status: 500 });

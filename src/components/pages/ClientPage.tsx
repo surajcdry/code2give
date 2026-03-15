@@ -217,10 +217,15 @@ export function ClientPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/map-data?filter=top_rated").then((r) => r.json()),
+      fetch("/api/map-data").then((r) => r.json()),
       loadFeedback(),
     ]).then(([mapData]) => {
-      setResources((mapData.pantries || []).slice(0, 8));
+      const list: Resource[] = mapData.listResources || mapData.pantries || [];
+      const topRated = list
+        .filter((r: Resource) => r.ratingAverage != null)
+        .sort((a: Resource, b: Resource) => (b.ratingAverage ?? 0) - (a.ratingAverage ?? 0))
+        .slice(0, 8);
+      setResources(topRated.length > 0 ? topRated : list.slice(0, 8));
       setLoading(false);
     });
   }, []);

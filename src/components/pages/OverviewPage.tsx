@@ -145,7 +145,7 @@ function PantryMapCard() {
       </button>
 
       {/* Visual Background Map */}
-      <div className="h-[380px] pointer-events-none grayscale-[30%] opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-500">
+      <div className="h-95 pointer-events-none grayscale-30 opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-500">
         <GoogleMap
           mapContainerStyle={MAP_STYLE}
           center={NYC_CENTER}
@@ -444,7 +444,7 @@ function DonorCharts({
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <div className="h-[220px] bg-gray-100 rounded animate-pulse" />
+          <div className="h-55 bg-gray-100 rounded animate-pulse" />
         )}
       </div>
       <div className="grid grid-cols-2 gap-6">
@@ -537,7 +537,7 @@ function GovernmentCharts({
               <Bar dataKey="unavailable" name="Unavailable" fill="#EF5350" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        ) : <div className="h-[240px] bg-gray-100 rounded animate-pulse" />}
+        ) : <div className="h-60 bg-gray-100 rounded animate-pulse" />}
       </div>
       <div className="grid grid-cols-2 gap-6">
         <RatingChart data={insights.ratingDistribution} />
@@ -578,7 +578,7 @@ function ProviderCharts({
                 <Bar dataKey="avgRating" fill="#2E7D32" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          ) : <div className="h-[200px] bg-gray-100 rounded animate-pulse" />}
+          ) : <div className="h-50 bg-gray-100 rounded animate-pulse" />}
         </div>
         <TypeBreakdownChart data={insights.typeBreakdown} />
         <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-4">
@@ -653,14 +653,10 @@ function KPIs({ role, insights, totalPantries }: {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export function OverviewPage() {
   const { role } = useApp();
-  const [totalPantries, setTotalPantries] = useState(0);
   const [insights, setInsights] = useState<Insights | null>(null);
   const [trends, setTrends] = useState<TrendsData | null>(null);
 
   useEffect(() => {
-    fetch("/api/map-data").then(r => r.json()).then(d => {
-      setTotalPantries(d.totalPantries ?? d.pantries?.length ?? 0);
-    });
     fetch("/api/insights").then(r => r.json()).then(setInsights);
     fetch("/api/trends").then(r => r.json()).then(d => {
       setTrends({ boroughs: d.boroughs ?? [], topEngaged: d.topEngaged ?? [] });
@@ -670,7 +666,7 @@ export function OverviewPage() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-4 gap-6">
-        <KPIs role={role} insights={insights} totalPantries={totalPantries} />
+        <KPIs role={role} insights={insights} totalPantries={insights?.summary?.total ?? 0} />
       </div>
 
       <div className="grid grid-cols-3 gap-6">
