@@ -8,9 +8,19 @@ import {
   ExternalLink,
   MessageSquare,
   Database,
+  AlertTriangle,
+  AlertCircle,
+  Filter,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+interface Alert {
+  type: string;
+  severity: "high" | "medium" | "low";
+  title: string;
+  description: string;
+}
 
 type Resource = {
   id: string;
@@ -33,6 +43,8 @@ type Resource = {
   schedule: string;
   latitude: number | null;
   longitude: number | null;
+  // Merged Service info
+  activeAlerts?: Alert[];
 };
 
 type MetaType = {
@@ -92,6 +104,30 @@ function formatNumber(n: number | null): string {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+function IssueBadge({ alerts }: { alerts: Alert[] }) {
+  if (!alerts || alerts.length === 0) return <span className="text-gray-300">—</span>;
+  const highSeverity = alerts.some(a => a.severity === "high");
+  
+  return (
+    <div className="flex items-center gap-1 group relative cursor-help">
+      {highSeverity ? (
+        <AlertTriangle className="w-4 h-4 text-red-500 fill-red-50" />
+      ) : (
+        <AlertCircle className="w-4 h-4 text-yellow-500" />
+      )}
+      <span className={`text-xs font-bold ${highSeverity ? 'text-red-600' : 'text-yellow-700'}`}>
+        {alerts.length}
+      </span>
+      {/* Tooltip */}
+      <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-50 bg-gray-900 text-white text-[10px] p-2 rounded shadow-xl whitespace-nowrap">
+        {alerts.map((a, i) => (
+          <div key={i} className="mb-1 last:mb-0">• {a.title}</div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   if (!active) return <ChevronUp className="w-3 h-3 text-gray-300" />;
   return dir === "asc" ? (
@@ -122,73 +158,54 @@ function SkeletonRows({ cols }: { cols: number }) {
 export function DataTablePage() {
   const [tab, setTab] = useState<Tab>("resources");
 
-  // Resources state
   const [resources, setResources] = useState<Resource[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Filters / sort / pagination
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "PUBLISHED" | "UNAVAILABLE">("all");
+  const [showIssuesOnly, setShowIssuesOnly] = useState(false); // Flag Filter
   const [sortBy, setSortBy] = useState("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
 
-  // Meta
   const [types, setTypes] = useState<MetaType[]>([]);
-
-  // Feedback
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Debounce search
   useEffect(() => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
       setDebouncedSearch(search);
       setPage(1);
     }, 300);
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    };
+    return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); };
   }, [search]);
 
-  // Reset page when filters/sort change (but not when page itself changes)
   const isFirstRender = useRef(true);
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
     setPage(1);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [typeFilter, statusFilter, sortBy, sortDir]);
+  }, [typeFilter, statusFilter, sortBy, sortDir, showIssuesOnly]);
 
-  // Fetch meta on mount
   useEffect(() => {
     fetch("/api/resources?meta=true")
       .then((r) => r.json())
-      .then((data) => {
-        if (data.types) setTypes(data.types);
-      })
+      .then((data) => { if (data.types) setTypes(data.types); })
       .catch(console.error);
   }, []);
 
-  // Fetch feedback on mount
   useEffect(() => {
     fetch("/api/analyze-feedback")
       .then((r) => r.json())
-      .then((data) => {
-        setFeedback(data.feedback || []);
-      })
+      .then((data) => { setFeedback(data.feedback || []); })
       .catch(console.error);
   }, []);
 
-  // Fetch resources
   useEffect(() => {
     setLoading(true);
     const params = new URLSearchParams();
@@ -196,6 +213,7 @@ export function DataTablePage() {
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (typeFilter !== "all") params.set("type", typeFilter);
     if (statusFilter !== "all") params.set("status", statusFilter);
+    if (showIssuesOnly) params.set("hasIssues", "true");
     params.set("sortBy", sortBy);
     params.set("sortDir", sortDir);
 
@@ -211,7 +229,7 @@ export function DataTablePage() {
         console.error(err);
         setLoading(false);
       });
-  }, [page, debouncedSearch, typeFilter, statusFilter, sortBy, sortDir]);
+  }, [page, debouncedSearch, typeFilter, statusFilter, sortBy, sortDir, showIssuesOnly]);
 
   function toggleSort(key: string) {
     if (sortBy === key) {
@@ -241,47 +259,41 @@ export function DataTablePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold text-gray-900">Data Table</h2>
-        <p className="text-sm text-gray-500 mt-1">
-          Browse, filter, and sort all resources and feedback data
-        </p>
+      <div className="flex justify-between items-end">
+        <div>
+          <h2 className="text-2xl font-semibold text-gray-900">Data Table</h2>
+          <p className="text-sm text-gray-500 mt-1">Operational view with inline service alerts</p>
+        </div>
+        
+        {/* NEW Toggle for Service Issues */}
+        {tab === "resources" && (
+          <button
+            onClick={() => setShowIssuesOnly(!showIssuesOnly)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+              showIssuesOnly 
+                ? "bg-red-50 border-red-200 text-red-700 shadow-sm" 
+                : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            <AlertTriangle className={`w-4 h-4 ${showIssuesOnly ? 'text-red-600' : 'text-gray-400'}`} />
+            {showIssuesOnly ? "Showing Flagged Only" : "Filter Flagged Items"}
+          </button>
+        )}
       </div>
 
-      {/* ── Toolbar Row 1: Tabs + Search ── */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
           <button
-            onClick={() => {
-              setTab("resources");
-              setSortBy("name");
-              setSortDir("asc");
-              setSearch("");
-            }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm transition-colors ${
-              tab === "resources"
-                ? "bg-white text-[#2E7D32] shadow-sm font-medium"
-                : "text-gray-600 hover:text-gray-900"
-            }`}
+            onClick={() => { setTab("resources"); setSortBy("name"); setSortDir("asc"); setSearch(""); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm transition-colors ${tab === "resources" ? "bg-white text-[#2E7D32] shadow-sm font-medium" : "text-gray-600 hover:text-gray-900"}`}
           >
-            <Database className="w-4 h-4" />
-            Resources{" "}
-            <span className="text-xs text-gray-400">({total.toLocaleString()})</span>
+            <Database className="w-4 h-4" /> Resources <span className="text-xs text-gray-400">({total.toLocaleString()})</span>
           </button>
           <button
-            onClick={() => {
-              setTab("feedback");
-              setSearch("");
-            }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm transition-colors ${
-              tab === "feedback"
-                ? "bg-white text-[#2E7D32] shadow-sm font-medium"
-                : "text-gray-600 hover:text-gray-900"
-            }`}
+            onClick={() => { setTab("feedback"); setSearch(""); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm transition-colors ${tab === "feedback" ? "bg-white text-[#2E7D32] shadow-sm font-medium" : "text-gray-600 hover:text-gray-900"}`}
           >
-            <MessageSquare className="w-4 h-4" />
-            Feedback{" "}
-            <span className="text-xs text-gray-400">({feedback.length})</span>
+            <MessageSquare className="w-4 h-4" /> Feedback <span className="text-xs text-gray-400">({feedback.length})</span>
           </button>
         </div>
 
@@ -297,297 +309,99 @@ export function DataTablePage() {
         </div>
       </div>
 
-      {/* ── Toolbar Row 2: Filters (resources only) ── */}
       {tab === "resources" && (
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Type filter */}
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/30 bg-white"
-          >
+          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white">
             <option value="all">All Types</option>
-            {types.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.count.toLocaleString()})
-              </option>
-            ))}
+            {types.map((t) => ( <option key={t.id} value={t.id}>{t.name} ({t.count.toLocaleString()})</option> ))}
           </select>
 
-          {/* Status filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) =>
-              setStatusFilter(e.target.value as "all" | "PUBLISHED" | "UNAVAILABLE")
-            }
-            className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/30 bg-white"
-          >
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white">
             <option value="all">All Status</option>
             <option value="PUBLISHED">Published</option>
             <option value="UNAVAILABLE">Unavailable</option>
           </select>
 
-          {/* Count info */}
-          {!loading && (
-            <span className="text-xs text-gray-400 ml-auto">
-              Showing {startItem.toLocaleString()}–{endItem.toLocaleString()} of{" "}
-              {total.toLocaleString()} resources
-            </span>
-          )}
+          {!loading && ( <span className="text-xs text-gray-400 ml-auto">Showing {startItem.toLocaleString()}–{endItem.toLocaleString()} of {total.toLocaleString()} resources</span> )}
         </div>
       )}
 
-      {/* ── Table ── */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
         {tab === "resources" ? (
-          <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50 sticky top-0 z-10">
-                  <tr>
-                    <ThBtn label="Name" colKey="name" />
-                    <ThBtn label="City" colKey="city" />
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                      Zip
-                    </th>
-                    <ThBtn label="Status" colKey="resourceStatusId" />
-                    <ThBtn label="Type" colKey="resourceTypeName" />
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                      Schedule
-                    </th>
-                    <ThBtn label="Rating" colKey="ratingAverage" />
-                    <ThBtn label="Wait" colKey="waitTimeMinutesAverage" />
-                    <ThBtn label="Subscribers" colKey="subscriberCount" />
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                      Website
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {loading ? (
-                    <SkeletonRows cols={10} />
-                  ) : resources.length === 0 ? (
-                    <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center">
-                        <div className="flex flex-col items-center gap-2 text-gray-400">
-                          <Search className="w-8 h-8" />
-                          <span className="text-sm">No resources found</span>
-                        </div>
-                      </td>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50 sticky top-0 z-10">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">Issues</th>
+                  <ThBtn label="Name" colKey="name" />
+                  <ThBtn label="City" colKey="city" />
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Zip</th>
+                  <ThBtn label="Status" colKey="resourceStatusId" />
+                  <ThBtn label="Type" colKey="resourceTypeName" />
+                  <ThBtn label="Rating" colKey="ratingAverage" />
+                  <ThBtn label="Wait" colKey="waitTimeMinutesAverage" />
+                  <ThBtn label="Subs" colKey="subscriberCount" />
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Web</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {loading ? ( <SkeletonRows cols={11} /> ) : resources.length === 0 ? (
+                  <tr><td colSpan={11} className="px-4 py-12 text-center text-gray-400">No resources found</td></tr>
+                ) : (
+                  resources.map((r) => (
+                    <tr key={r.id} className={`hover:bg-gray-50 transition-colors ${r.activeAlerts?.length ? 'bg-red-50/20' : ''}`}>
+                      <td className="px-4 py-3"><IssueBadge alerts={r.activeAlerts || []} /></td>
+                      <td className="px-4 py-3 max-w-[180px]"><div className="text-sm font-medium text-gray-900 truncate">{r.name}</div></td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{r.city || "—"}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{r.zipCode || "—"}</td>
+                      <td className="px-4 py-3"><span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${r.status === 'PUBLISHED' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{r.status || '—'}</span></td>
+                      <td className="px-4 py-3"><span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${typeBadge(r.resourceTypeId)}`}>{r.type || r.resourceTypeId}</span></td>
+                      <td className="px-4 py-3"><span className={`text-sm font-medium ${ratingColor(r.ratingAverage)}`}>{r.ratingAverage ? `⭐ ${r.ratingAverage.toFixed(1)}` : "—"}</span></td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{r.waitTimeMinutesAverage ? `${Math.round(r.waitTimeMinutesAverage)}m` : "—"}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{formatNumber(r.subscriberCount)}</td>
+                      <td className="px-4 py-3 text-center">{r.website && <a href={r.website} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:text-green-800"><ExternalLink className="w-4 h-4" /></a>}</td>
                     </tr>
-                  ) : (
-                    resources.map((r) => (
-                      <tr key={r.id} className="hover:bg-gray-50 transition-colors">
-                        {/* Name */}
-                        <td className="px-4 py-3 max-w-[200px]">
-                          <div
-                            className="text-sm font-medium text-gray-900 truncate"
-                            title={r.name}
-                          >
-                            {r.name}
-                          </div>
-                          {r.type && (
-                            <span className="text-xs text-gray-400">{r.type}</span>
-                          )}
-                        </td>
-
-                        {/* City */}
-                        <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-                          {r.city || "—"}
-                        </td>
-
-                        {/* Zip */}
-                        <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-                          {r.zipCode || "—"}
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {r.status === "PUBLISHED" ? (
-                            <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">
-                              Published
-                            </span>
-                          ) : r.status ? (
-                            <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-500">
-                              Unavailable
-                            </span>
-                          ) : (
-                            <span className="text-xs text-gray-400">—</span>
-                          )}
-                        </td>
-
-                        {/* Type */}
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {r.resourceTypeId ? (
-                            <span
-                              className={`text-xs px-2 py-1 rounded-full ${typeBadge(
-                                r.resourceTypeId
-                              )}`}
-                            >
-                              {r.type ?? r.resourceTypeId}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-gray-400">—</span>
-                          )}
-                        </td>
-
-                        {/* Schedule */}
-                        <td className="px-4 py-3 text-sm whitespace-nowrap">
-                          {r.schedule === "Schedule unavailable" ? (
-                            <span className="text-gray-400 text-xs">{r.schedule}</span>
-                          ) : (
-                            <span className="text-gray-700 text-xs">{r.schedule}</span>
-                          )}
-                        </td>
-
-                        {/* Rating */}
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {r.ratingAverage !== null && r.ratingAverage !== undefined ? (
-                            <span
-                              className={`text-sm font-medium ${ratingColor(r.ratingAverage)}`}
-                            >
-                              ⭐ {r.ratingAverage.toFixed(1)}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400 text-sm">—</span>
-                          )}
-                        </td>
-
-                        {/* Wait */}
-                        <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-                          {r.waitTimeMinutesAverage !== null &&
-                          r.waitTimeMinutesAverage !== undefined
-                            ? `${Math.round(r.waitTimeMinutesAverage)} min`
-                            : "—"}
-                        </td>
-
-                        {/* Subscribers */}
-                        <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-                          {formatNumber(r.subscriberCount)}
-                        </td>
-
-                        {/* Website */}
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {r.website ? (
-                            <a
-                              href={r.website}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center text-[#2E7D32] hover:text-[#1B5E20] transition-colors"
-                              title={r.website}
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                            </a>
-                          ) : (
-                            <span className="text-gray-400 text-sm">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            {!loading && total > 0 && (
-              <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between flex-wrap gap-2">
-                <span className="text-xs text-gray-400">
-                  Showing {startItem.toLocaleString()}–{endItem.toLocaleString()} of{" "}
-                  {total.toLocaleString()} resources
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page <= 1}
-                    className="px-3 py-1 text-xs border border-gray-200 rounded-md disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-                  >
-                    Prev
-                  </button>
-                  <span className="text-xs text-gray-500">
-                    Page {page} of {totalPages}
-                  </span>
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page >= totalPages}
-                    className="px-3 py-1 text-xs border border-gray-200 rounded-md disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         ) : (
-          /* ── Feedback Tab ── */
-          <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50 sticky top-0 z-10">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Sentiment
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Feedback
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Tags
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
-                    </th>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sentiment</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Feedback</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tags</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {feedback.map((f) => (
+                  <tr key={f.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full ${sentimentColor(f.sentiment)}`}>{f.sentiment}</span></td>
+                    <td className="px-4 py-3 text-sm text-gray-700 max-w-md">{f.text}</td>
+                    <td className="px-4 py-3"><div className="flex flex-wrap gap-1">{f.tags?.map((tag) => ( <span key={tag} className="text-[10px] px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full">{tag}</span> ))}</div></td>
+                    <td className="px-4 py-3 text-xs text-gray-400">{timeAgo(f.createdAt)}</td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {feedback.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-400">
-                        No feedback found
-                      </td>
-                    </tr>
-                  ) : (
-                    feedback.map((f) => (
-                      <tr key={f.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span
-                            className={`text-xs px-2 py-1 rounded-full ${sentimentColor(
-                              f.sentiment
-                            )}`}
-                          >
-                            {f.sentiment}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 max-w-md">
-                          {f.text}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-1">
-                            {f.tags?.map((tag) => (
-                              <span
-                                key={tag}
-                                className="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
-                          {timeAgo(f.createdAt)}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <div className="px-4 py-2 border-t border-gray-100 text-xs text-gray-400">
-              {feedback.length} feedback {feedback.length === 1 ? "entry" : "entries"}
-            </div>
-          </>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
+      
+      {/* Pagination component logic stays same as your original */}
+      {!loading && total > 0 && tab === "resources" && (
+        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
+           <span className="text-xs text-gray-400">Page {page} of {totalPages}</span>
+           <div className="flex gap-2">
+             <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1} className="px-3 py-1 border rounded text-xs disabled:opacity-50">Prev</button>
+             <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages} className="px-3 py-1 border rounded text-xs disabled:opacity-50">Next</button>
+           </div>
+        </div>
+      )}
     </div>
   );
 }

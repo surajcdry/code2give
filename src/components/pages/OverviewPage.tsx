@@ -5,12 +5,13 @@ import { useApp } from "@/components/layout/AppLayout";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { GoogleMap, Marker, InfoWindow, Circle } from "@react-google-maps/api";
 import {
-  MapPin, Clock, AlertTriangle, Users, Star, BarChart3, TrendingDown,
+  MapPin, Clock, AlertTriangle, Users, Star, BarChart3, TrendingDown, Maximize2, Search
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, PieChart, Pie, Legend,
 } from "recharts";
+import { OpenMapButton } from "@/components/dashboard/OpenMapButton";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Pantry = {
@@ -76,153 +77,93 @@ const FILTER_OPTIONS = [
 type FilterValue = typeof FILTER_OPTIONS[number]["value"];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getMarkerIcon(badge?: string): any {
   const colors: Record<string, string> = {
     Excellent: "#2E7D32",
     Good:      "#F9A825",
     "At Risk": "#E53935",
   };
-  const color = colors[badge ?? ""] ?? "#42A5F5"; // blue default (no score)
+  const color = colors[badge ?? ""] ?? "#42A5F5";
   return {
-    path: "M 0, 0 m -8, 0 a 8,8 0 1,0 16,0 a 8,8 0 1,0 -16,0", // circle
+    path: "M 0, 0 m -8, 0 a 8,8 0 1,0 16,0 a 8,8 0 1,0 -16,0",
     fillColor: color,
     fillOpacity: 0.9,
     strokeColor: "#ffffff",
     strokeWeight: 2,
-    scale: 1,
+    scale: 0.8, // Slightly smaller for preview
   };
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
+
+/**
+ * UPDATED: PantryMapCard now functions as an interactive preview box
+ * clicking the map triggers navigation to the full map page.
+ */
 function PantryMapCard() {
-  const [tab, setTab] = useState<"locations" | "coverage">("locations");
-  const [selected, setSelected] = useState<Pantry | null>(null);
-  const [filter, setFilter] = useState<FilterValue>("default");
+  const { setPage } = useApp();
   const [pantries, setPantries] = useState<Pantry[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
-    setSelected(null);
-    fetch(`/api/map-data?filter=${filter}`)
+    fetch(`/api/map-data?filter=default`)
       .then(r => r.json())
-      .then(d => setPantries(d.pantries || []))
+      .then(d => setPantries(d.pantries?.slice(0, 40) || []))
       .finally(() => setLoading(false));
-  }, [filter]);
+  }, []);
 
   return (
-    <div className="col-span-2 bg-card rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 gap-4">
+    <div className="col-span-2 bg-card rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col group relative transition-all hover:border-primary/50">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 z-20 bg-white">
         <div>
-          <h2 className="text-gray-900">Active Pantry Locations</h2>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {loading ? "Loading…" : `Top 500 · ${FILTER_OPTIONS.find(o => o.value === filter)?.label}`}
+          <h2 className="text-gray-900 font-bold flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-primary" />
+            Active Pantry Locations
+          </h2>
+          <p className="text-[11px] text-gray-400 mt-0.5">
+            Click map to enter full interactive resource view
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <select
-            value={filter}
-            onChange={e => setFilter(e.target.value as FilterValue)}
-            className="border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
-          >
-            {FILTER_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-          <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
-            {(["locations", "coverage"] as const).map(t => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`px-3 py-1 text-xs rounded-md capitalize transition-colors ${
-                  tab === t ? "bg-white shadow-sm text-gray-900 font-medium" : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                {t === "locations" ? "Locations" : "Coverage Area"}
-              </button>
-            ))}
-          </div>
+        <div className="bg-gray-50 p-2 rounded-lg group-hover:bg-primary/10 transition-colors">
+          <Maximize2 className="w-4 h-4 text-gray-400 group-hover:text-primary" />
         </div>
       </div>
-      <div className="h-[380px]">
+
+      {/* Clickable Action Layer */}
+      <button 
+        onClick={() => setPage("map")} 
+        className="absolute inset-0 z-30 w-full h-full cursor-pointer flex items-center justify-center"
+        aria-label="Open full map"
+      >
+        <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 bg-black/5 absolute inset-0 flex items-center justify-center backdrop-blur-[1px]">
+          <div className="bg-white px-6 py-3 rounded-xl shadow-xl border border-gray-100 flex items-center gap-3 transform translate-y-4 group-hover:translate-y-0 transition-transform">
+            <Search className="w-4 h-4 text-primary" />
+            <span className="text-sm font-bold text-gray-900">Explore Interactive Map</span>
+          </div>
+        </div>
+      </button>
+
+      {/* Visual Background Map */}
+      <div className="h-[380px] pointer-events-none grayscale-[30%] opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-500">
         <GoogleMap
           mapContainerStyle={MAP_STYLE}
           center={NYC_CENTER}
           zoom={11}
-          options={{ scrollwheel: true, gestureHandling: "greedy", zoomControl: true }}
+          options={{ 
+            disableDefaultUI: true, 
+            gestureHandling: "none",
+            styles: [{ featureType: "all", elementType: "labels", stylers: [{ visibility: "off" }] }] 
+          }}
         >
-          {tab === "locations" && pantries.map((p) => (
+          {pantries.map((p) => (
             <Marker
               key={p.id}
               position={{ lat: p.latitude, lng: p.longitude }}
-              onClick={() => setSelected(selected?.id === p.id ? null : p)}
               icon={getMarkerIcon(p.badge)}
-            >
-              {selected?.id === p.id && (
-                <InfoWindow onCloseClick={() => setSelected(null)}>
-                  <div className="w-44">
-                    <p className="font-semibold text-sm mb-1">{p.name}</p>
-                    <p className="text-xs text-gray-500 mb-1">{p.description}</p>
-                    {p.badge && (
-                      <div className="flex items-center gap-1 mt-1">
-                        <span
-                          style={{ color: p.badgeColor === "green" ? "#2E7D32" : p.badgeColor === "yellow" ? "#F9A825" : "#E53935" }}
-                          className="text-xs font-semibold"
-                        >
-                          ● {p.badge}
-                        </span>
-                        <span className="text-xs text-gray-500">({p.reliabilityScore})</span>
-                      </div>
-                    )}
-                    <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded">{p.hours}</span>
-                  </div>
-                </InfoWindow>
-              )}
-            </Marker>
-          ))}
-          {tab === "coverage" && pantries.map((p) => (
-            <Circle
-              key={p.id}
-              center={{ lat: p.latitude, lng: p.longitude }}
-              radius={COVERAGE_RADIUS_M}
-              options={{
-                fillColor: TYPE_COLORS[p.resourceTypeId ?? ""] ?? "#2E7D32",
-                fillOpacity: 0.12,
-                strokeColor: TYPE_COLORS[p.resourceTypeId ?? ""] ?? "#2E7D32",
-                strokeOpacity: 0.5,
-                strokeWeight: 1.5,
-              }}
-              onClick={() => setSelected(selected?.id === p.id ? null : p)}
             />
           ))}
-          {tab === "coverage" && selected && (
-            <InfoWindow
-              position={{ lat: selected.latitude, lng: selected.longitude }}
-              onCloseClick={() => setSelected(null)}
-            >
-              <div className="w-44">
-                <p className="font-semibold text-sm mb-1">{selected.name}</p>
-                <p className="text-xs text-gray-500">~{COVERAGE_RADIUS_M}m coverage radius</p>
-              </div>
-            </InfoWindow>
-          )}
         </GoogleMap>
-      </div>
-      {/* Marker color legend */}
-      <div className="flex items-center gap-4 px-3 py-2 text-xs text-gray-500 border-t border-gray-100">
-        <span className="font-medium text-gray-700">Marker color:</span>
-        {[
-          { label: "Excellent", color: "#2E7D32" },
-          { label: "Good", color: "#F9A825" },
-          { label: "At Risk", color: "#E53935" },
-          { label: "No data", color: "#42A5F5" },
-        ].map(({ label, color }) => (
-          <span key={label} className="flex items-center gap-1">
-            <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
-            {label}
-          </span>
-        ))}
       </div>
     </div>
   );
@@ -236,7 +177,7 @@ function StatusCard({ insights }: { insights: Insights }) {
   return (
     <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col gap-4">
       <div>
-        <h3 className="text-gray-900">Resource Status</h3>
+        <h3 className="text-gray-900 font-bold">Resource Status</h3>
         <p className="text-xs text-gray-400 mt-0.5">Published vs unavailable</p>
       </div>
       <div className="flex-1 flex items-center justify-center">
@@ -285,7 +226,7 @@ function RatingChart({
   return (
     <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="mb-4">
-        <h3 className="text-gray-900">{title ?? "Rating Distribution"}</h3>
+        <h3 className="text-gray-900 font-bold">{title ?? "Rating Distribution"}</h3>
         <p className="text-xs text-gray-400 mt-0.5">
           {subtitle ?? "Published resources with ratings (scale 1–5)"}
         </p>
@@ -320,7 +261,7 @@ function WaitTimeChart({
   return (
     <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="mb-4">
-        <h3 className="text-gray-900">{title ?? "Wait Time Distribution"}</h3>
+        <h3 className="text-gray-900 font-bold">{title ?? "Wait Time Distribution"}</h3>
         <p className="text-xs text-gray-400 mt-0.5">
           {subtitle ?? "Published resources · outliers (>240 min) excluded"}
         </p>
@@ -351,7 +292,7 @@ function TypeBreakdownChart({
   return (
     <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="mb-4">
-        <h3 className="text-gray-900">{title ?? "Resource Type Breakdown"}</h3>
+        <h3 className="text-gray-900 font-bold">{title ?? "Resource Type Breakdown"}</h3>
         <p className="text-xs text-gray-400 mt-0.5">
           {subtitle ?? "All NYC metro food resources"}
         </p>
@@ -398,7 +339,7 @@ function InternalCharts({ insights }: { insights: Insights }) {
 
   return (
     <>
-      <p className="text-xs text-gray-400 uppercase tracking-wider mb-4">System Health View</p>
+      <p className="text-xs text-gray-400 uppercase tracking-wider mb-4 font-bold">System Health View</p>
       <div className="grid grid-cols-3 gap-6">
         <TypeBreakdownChart data={insights.typeBreakdown} />
         <RatingChart data={insights.ratingDistribution} />
@@ -407,7 +348,7 @@ function InternalCharts({ insights }: { insights: Insights }) {
       <div className="bg-card rounded-lg shadow-sm border border-gray-200 mt-6">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <div>
-            <h3 className="text-gray-900">Top Pantries by Engagement</h3>
+            <h3 className="text-gray-900 font-bold">Top Pantries by Engagement</h3>
             <p className="text-xs text-gray-400 mt-0.5">Published NYC resources</p>
           </div>
           <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
@@ -475,12 +416,10 @@ function DonorCharts({
 
   return (
     <>
-      <p className="text-xs text-gray-400 uppercase tracking-wider mb-4">Donor Intelligence View</p>
-
-      {/* Chart 1: Borough Availability Gap — full width */}
+      <p className="text-xs text-gray-400 uppercase tracking-wider mb-4 font-bold">Donor Intelligence View</p>
       <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
         <div className="mb-4">
-          <h3 className="text-gray-900">Unavailable Resources by Borough</h3>
+          <h3 className="text-gray-900 font-bold">Unavailable Resources by Borough</h3>
           <p className="text-xs text-gray-400 mt-0.5">
             Where food access gaps are largest — highest impact for donations
           </p>
@@ -508,32 +447,20 @@ function DonorCharts({
           <div className="h-[220px] bg-gray-100 rounded animate-pulse" />
         )}
       </div>
-
-      {/* Chart 2 + 3 side by side */}
       <div className="grid grid-cols-2 gap-6">
-        {/* High-Need Zip Codes */}
         <div className="bg-card rounded-lg shadow-sm border border-gray-200">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-gray-900">High-Activity Zip Codes</h3>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Areas with the most food resources — indicating high demand
-            </p>
+            <h3 className="text-gray-900 font-bold">High-Activity Zip Codes</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Areas indication high demand</p>
           </div>
           <div className="divide-y divide-gray-100">
-            <div className="px-6 py-2 grid grid-cols-3 gap-4">
-              <span className="text-xs font-medium text-gray-500">Zip Code</span>
-              <span className="text-xs font-medium text-gray-500 text-center">Total Resources</span>
-              <span className="text-xs font-medium text-gray-500 text-right">Activity</span>
-            </div>
             {zipRows.map((z, i) => (
               <div key={i} className="px-6 py-2.5 grid grid-cols-3 gap-4 items-center hover:bg-gray-50 transition-colors">
                 <span className="text-sm font-medium text-gray-900">{z.zip}</span>
                 <span className="text-sm text-gray-700 text-center">{z.count.toLocaleString()}</span>
                 <div className="flex justify-end">
                   {z.count > 5 ? (
-                    <span className="text-[10px] font-medium bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
-                      High Activity
-                    </span>
+                    <span className="text-[10px] font-medium bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">High Activity</span>
                   ) : (
                     <span className="text-[10px] text-gray-400">—</span>
                   )}
@@ -542,26 +469,16 @@ function DonorCharts({
             ))}
           </div>
         </div>
-
-        {/* Top Pantries by Community Trust */}
         <div className="bg-card rounded-lg shadow-sm border border-gray-200">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-gray-900">Most Trusted Pantries</h3>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Highest subscriber count — community-validated resources
-            </p>
+            <h3 className="text-gray-900 font-bold">Most Trusted Pantries</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Community-validated resources</p>
           </div>
           <div className="divide-y divide-gray-100">
-            <div className="px-6 py-2 grid grid-cols-3 gap-4">
-              <span className="text-xs font-medium text-gray-500 col-span-1">Name</span>
-              <span className="text-xs font-medium text-gray-500 text-center">Subscribers</span>
-              <span className="text-xs font-medium text-gray-500 text-right">Rating</span>
-            </div>
             {topSubscribers.map((p, i) => (
               <div key={i} className="px-6 py-2.5 grid grid-cols-3 gap-4 items-center hover:bg-gray-50 transition-colors">
                 <div className="col-span-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{p.name}</p>
-                  <p className="text-xs text-gray-400 truncate">{p.location}</p>
                 </div>
                 <span className="text-sm text-gray-700 text-center">{p.subscribers.toLocaleString()}</span>
                 <div className="flex justify-end">
@@ -570,9 +487,7 @@ function DonorCharts({
                       <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
                       <span className="text-xs text-gray-600">{p.rating}</span>
                     </div>
-                  ) : (
-                    <span className="text-xs text-gray-400">—</span>
-                  )}
+                  ) : <span className="text-xs text-gray-400">—</span>}
                 </div>
               </div>
             ))}
@@ -598,15 +513,11 @@ function GovernmentCharts({
 
   return (
     <>
-      <p className="text-xs text-gray-400 uppercase tracking-wider mb-4">Coverage &amp; Equity View</p>
-
-      {/* Chart 1: Published vs Unavailable by Borough — full width */}
+      <p className="text-xs text-gray-400 uppercase tracking-wider mb-4 font-bold">Coverage & Equity View</p>
       <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
         <div className="mb-4">
-          <h3 className="text-gray-900">Resource Status by Borough</h3>
-          <p className="text-xs text-gray-400 mt-0.5">
-            Published vs unavailable resources across NYC boroughs
-          </p>
+          <h3 className="text-gray-900 font-bold">Resource Status by Borough</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Published vs unavailable resources across NYC</p>
         </div>
         {trends ? (
           <ResponsiveContainer width="100%" height={240}>
@@ -626,23 +537,11 @@ function GovernmentCharts({
               <Bar dataKey="unavailable" name="Unavailable" fill="#EF5350" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        ) : (
-          <div className="h-[240px] bg-gray-100 rounded animate-pulse" />
-        )}
+        ) : <div className="h-[240px] bg-gray-100 rounded animate-pulse" />}
       </div>
-
-      {/* Chart 2 + 3 side by side */}
       <div className="grid grid-cols-2 gap-6">
-        <RatingChart
-          data={insights.ratingDistribution}
-          title="Rating Distribution Across NYC"
-          subtitle="How evenly quality is distributed — low ratings indicate service gaps"
-        />
-        <WaitTimeChart
-          data={insights.waitTimeDistribution}
-          title="Wait Time Distribution"
-          subtitle="Long wait times indicate understaffed or overloaded resources"
-        />
+        <RatingChart data={insights.ratingDistribution} />
+        <WaitTimeChart data={insights.waitTimeDistribution} />
       </div>
     </>
   );
@@ -663,16 +562,11 @@ function ProviderCharts({
 
   return (
     <>
-      <p className="text-xs text-gray-400 uppercase tracking-wider mb-4">NYC Benchmarks View</p>
-
+      <p className="text-xs text-gray-400 uppercase tracking-wider mb-4 font-bold">NYC Benchmarks View</p>
       <div className="grid grid-cols-3 gap-6">
-        {/* Chart 1: Average Rating by Borough */}
         <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="mb-4">
-            <h3 className="text-gray-900">Average Rating by Borough</h3>
-            <p className="text-xs text-gray-400 mt-0.5">
-              How your community compares to NYC averages
-            </p>
+            <h3 className="text-gray-900 font-bold">Average Rating by Borough</h3>
           </div>
           {trends ? (
             <ResponsiveContainer width="100%" height={200}>
@@ -680,65 +574,25 @@ function ProviderCharts({
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                 <XAxis dataKey="borough" tick={{ fontSize: 10 }} stroke="#9ca3af" />
                 <YAxis domain={[0, 5]} tick={{ fontSize: 11 }} stroke="#9ca3af" />
-                <Tooltip
-                  formatter={(v) => [`${v} / 5`, "Avg Rating"]}
-                  contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb" }}
-                />
+                <Tooltip />
                 <Bar dataKey="avgRating" fill="#2E7D32" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          ) : (
-            <div className="h-[200px] bg-gray-100 rounded animate-pulse" />
-          )}
+          ) : <div className="h-[200px] bg-gray-100 rounded animate-pulse" />}
         </div>
-
-        {/* Chart 3: Resource Type Breakdown */}
-        <TypeBreakdownChart
-          data={insights.typeBreakdown}
-          title="NYC Resource Mix"
-          subtitle="Types of food resources available across the city"
-        />
-
-        {/* Chart 2: Top Pantries by Engagement */}
-        <div className="bg-card rounded-lg shadow-sm border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-gray-900">Community Engagement Leaders</h3>
-            <p className="text-xs text-gray-400 mt-0.5">
-              The most active resources in NYC — benchmark targets
-            </p>
-          </div>
+        <TypeBreakdownChart data={insights.typeBreakdown} />
+        <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-4">
+          <h3 className="text-gray-900 font-bold mb-4">Engagement Leaders</h3>
           {trends ? (
-            <div className="divide-y divide-gray-100">
-              <div className="px-4 py-2 grid grid-cols-5 gap-2">
-                <span className="text-xs font-medium text-gray-500 col-span-2">Name</span>
-                <span className="text-xs font-medium text-gray-500 text-center">City</span>
-                <span className="text-xs font-medium text-gray-500 text-center">Subs</span>
-                <span className="text-xs font-medium text-gray-500 text-right">Rating</span>
-              </div>
+            <div className="space-y-3">
               {topEngaged.map((p, i) => (
-                <div key={i} className="px-4 py-2.5 grid grid-cols-5 gap-2 items-center hover:bg-gray-50 transition-colors">
-                  <div className="col-span-2 min-w-0">
-                    <p className="text-xs font-medium text-gray-900 truncate">{p.name}</p>
-                    <p className="text-[10px] text-gray-400">{p.reviews} reviews</p>
-                  </div>
-                  <span className="text-xs text-gray-600 text-center truncate">{p.city ?? "—"}</span>
-                  <span className="text-xs text-gray-700 text-center">{p.subscribers.toLocaleString()}</span>
-                  <div className="flex justify-end">
-                    {p.rating != null ? (
-                      <div className="flex items-center gap-0.5">
-                        <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                        <span className="text-xs text-gray-600">{p.rating.toFixed(1)}</span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-gray-400">—</span>
-                    )}
-                  </div>
+                <div key={i} className="flex justify-between items-center text-xs">
+                  <span className="truncate w-32 font-medium">{p.name}</span>
+                  <span className="text-gray-500">{p.subscribers} subs</span>
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="h-48 bg-gray-100 rounded animate-pulse m-4" />
-          )}
+          ) : <div className="h-48 bg-gray-100 rounded animate-pulse" />}
         </div>
       </div>
     </>
@@ -754,80 +608,46 @@ function RoleCharts({
   insights: Insights | null;
   trends: TrendsData | null;
 }) {
-  if (!insights) {
-    return (
-      <div className="space-y-6">
-        <ChartSkeleton />
-        <div className="h-48 bg-gray-100 rounded-lg animate-pulse" />
-      </div>
-    );
-  }
-
+  if (!insights) return <ChartSkeleton />;
   switch (role) {
-    case "internal":
-      return <InternalCharts insights={insights} />;
-    case "donor":
-      return <DonorCharts insights={insights} trends={trends} />;
-    case "government":
-      return <GovernmentCharts insights={insights} trends={trends} />;
-    case "provider":
-      return <ProviderCharts insights={insights} trends={trends} />;
-    default:
-      return <InternalCharts insights={insights} />;
+    case "internal": return <InternalCharts insights={insights} />;
+    case "donor": return <DonorCharts insights={insights} trends={trends} />;
+    case "government": return <GovernmentCharts insights={insights} trends={trends} />;
+    case "provider": return <ProviderCharts insights={insights} trends={trends} />;
+    default: return <InternalCharts insights={insights} />;
   }
 }
 
-// ── KPI sets per role ─────────────────────────────────────────────────────────
 function KPIs({ role, insights, totalPantries }: {
   role: string | undefined;
   insights: Insights | null;
   totalPantries: number;
 }) {
   if (!insights) return <div className="col-span-4 h-24 bg-gray-50 rounded-lg animate-pulse" />;
-
   const { summary } = insights;
-  const unavailablePct = Math.round((summary.unavailable / summary.total) * 100);
+  const gap = Math.round((summary.unavailable / summary.total) * 100);
 
-  switch (role) {
-    case "internal":
-      return (
-        <>
-          <KPICard title="Published Resources" value={summary.published.toLocaleString()} icon={MapPin} subtitle="NYC metro area" />
-          <KPICard title="Unavailable Resources" value={`${unavailablePct}%`} icon={AlertTriangle} subtitle={`${summary.unavailable.toLocaleString()} need review`} />
-          <KPICard title="Avg Rating" value={summary.avgRating.toFixed(2)} icon={Star} subtitle={`${summary.rated.toLocaleString()} rated resources`} />
-          <KPICard title="Median Wait Time" value={`${summary.medianWaitMinutes} min`} icon={Clock} subtitle="Among resources with data" />
-        </>
-      );
-    case "government":
-      return (
-        <>
-          <KPICard title="Total Resources Mapped" value={summary.total.toLocaleString()} icon={MapPin} subtitle="Food pantries, soup kitchens, fridges" />
-          <KPICard title="Service Gaps" value={`${unavailablePct}%`} icon={TrendingDown} subtitle={`${summary.unavailable.toLocaleString()} unavailable resources`} />
-          <KPICard title="Avg Community Rating" value={summary.avgRating.toFixed(2)} icon={BarChart3} subtitle="Out of 5.0" />
-          <KPICard title="Resources w/ Subscribers" value={summary.hasSubscribers.toLocaleString()} icon={Users} subtitle="Active community followers" />
-        </>
-      );
-    case "donor":
-      return (
-        <>
-          <KPICard title="Active Food Resources" value={summary.published.toLocaleString()} icon={MapPin} subtitle="Currently published" />
-          <KPICard title="Needing Support" value={summary.unavailable.toLocaleString()} icon={AlertTriangle} subtitle="Currently unavailable" />
-          <KPICard title="Community Engagement" value={summary.hasSubscribers.toLocaleString()} icon={Users} subtitle="Resources with active followers" />
-          <KPICard title="Avg Wait Time" value={`${summary.medianWaitMinutes} min`} icon={Clock} subtitle="Median across NYC" />
-        </>
-      );
-    case "provider":
-      return (
-        <>
-          <KPICard title="Active Pantries Nearby" value={totalPantries.toLocaleString()} icon={MapPin} subtitle="Published in NYC" />
-          <KPICard title="Median Wait Time" value={`${summary.medianWaitMinutes} min`} icon={Clock} subtitle="Across all pantries" />
-          <KPICard title="Avg Rating" value={summary.avgRating.toFixed(2)} icon={Star} subtitle={`${summary.rated.toLocaleString()} rated`} />
-          <KPICard title="Resources w/ Reviews" value={summary.hasReviews.toLocaleString()} icon={BarChart3} subtitle="Community feedback exists" />
-        </>
-      );
-    default:
-      return null;
-  }
+  const governmentKPIs = [
+    { title: "Total Resources Mapped", value: summary.total.toLocaleString(), icon: MapPin, subtitle: "NYC Metro area" },
+    { title: "Service Gaps", value: `${gap}%`, icon: TrendingDown, subtitle: `${summary.unavailable.toLocaleString()} unavailable` },
+    { title: "Avg Community Rating", value: summary.avgRating.toFixed(2), icon: BarChart3, subtitle: "Out of 5.0" },
+    { title: "Engagement", value: summary.hasSubscribers.toLocaleString(), icon: Users, subtitle: "Active followers" },
+  ];
+
+  const defaultKPIs = [
+    { title: "Published Resources", value: summary.published.toLocaleString(), icon: MapPin, subtitle: "Active on map" },
+    { title: "Gap", value: `${gap}%`, icon: AlertTriangle, subtitle: "Need review" },
+    { title: "Rating", value: summary.avgRating.toFixed(2), icon: Star, subtitle: "Avg score" },
+    { title: "Wait Time", value: `${summary.medianWaitMinutes} min`, icon: Clock, subtitle: "Median" },
+  ];
+
+  const activeKPIs = role === "government" ? governmentKPIs : defaultKPIs;
+
+  return (
+    <>
+      {activeKPIs.map((k, i) => <KPICard key={i} {...k} />)}
+    </>
+  );
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
@@ -843,27 +663,21 @@ export function OverviewPage() {
     });
     fetch("/api/insights").then(r => r.json()).then(setInsights);
     fetch("/api/trends").then(r => r.json()).then(d => {
-      setTrends({
-        boroughs: d.boroughs ?? [],
-        topEngaged: d.topEngaged ?? [],
-      });
+      setTrends({ boroughs: d.boroughs ?? [], topEngaged: d.topEngaged ?? [] });
     });
   }, []);
 
   return (
     <div className="space-y-6">
-      {/* KPIs */}
       <div className="grid grid-cols-4 gap-6">
         <KPIs role={role} insights={insights} totalPantries={totalPantries} />
       </div>
 
-      {/* Map + Status */}
       <div className="grid grid-cols-3 gap-6">
         <PantryMapCard />
         {insights && <StatusCard insights={insights} />}
       </div>
 
-      {/* Role-specific charts */}
       <RoleCharts role={role} insights={insights} trends={trends} />
     </div>
   );
