@@ -1,0 +1,9 @@
+torch
+torch-geometric
+scikit-learn
+pandas
+numpy
+censusgeocode
+psycopg2-binary
+python-dotenv
+tqdm

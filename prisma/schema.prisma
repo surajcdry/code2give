@@ -1,5 +1,8 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Local development workflow:
+//   - Generate client: `npx prisma generate`
+//   - Create & apply a new migration to your *local/dev* DB: `npx prisma migrate dev --name <message>`
+// For Supabase / remote (e.g. prod) environments, apply existing migrations with: `npx prisma migrate deploy`
+// To update this schema from an existing Supabase database, use: `npx prisma db pull`
 
 generator client {
   provider = "prisma-client-js"
@@ -8,12 +11,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-}
-
-enum Role {
-  DONOR
-  GOV
-  ADMIN
 }
 
 model Stakeholder {
@@ -26,7 +23,7 @@ model Stakeholder {
 }
 
 model Resource {
-  id                     String   @id
+  id                     String      @id
   name                   String?
   description            String?
   description_es         String?
@@ -42,27 +39,29 @@ model Resource {
   resourceTypeId         String?
   resourceTypeName       String?
   resourceStatusId       String?
-  openByAppointment      Boolean  @default(false)
-  appointmentRequired    Boolean  @default(false)
-  acceptingNewClients    Boolean  @default(true)
+  openByAppointment      Boolean     @default(false)
+  appointmentRequired    Boolean     @default(false)
+  acceptingNewClients    Boolean     @default(true)
   confidence             Float?
   ratingAverage          Float?
   waitTimeMinutesAverage Float?
-  reviewCount            Int      @default(0)
-  subscriberCount        Int      @default(0)
+  reviewCount            Int         @default(0)
+  subscriberCount        Int         @default(0)
   priority               Int?
   mergedToResourceId     String?
-  contacts               Json     @default("[]")
-  images                 Json     @default("[]")
-  shifts                 Json     @default("[]")
-  occurrences            Json     @default("[]")
-  occurrenceSkipRanges   Json     @default("[]")
-  tags                   Json     @default("[]")
-  regionsServed          Json     @default("[]")
-  resourceSlugs          Json     @default("[]")
-  syncedAt               DateTime @default(now())
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  tractId                String?
+  gnnScore               Float?
+  contacts               Json        @default("[]")
+  images                 Json        @default("[]")
+  shifts                 Json        @default("[]")
+  occurrences            Json        @default("[]")
+  occurrenceSkipRanges   Json        @default("[]")
+  tags                   Json        @default("[]")
+  regionsServed          Json        @default("[]")
+  resourceSlugs          Json        @default("[]")
+  syncedAt               DateTime    @default(now())
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
   feedback               Feedback[]
 }
 
@@ -72,9 +71,9 @@ model Feedback {
   sentiment  String?
   tags       String[]
   resourceId String?
-  resource   Resource? @relation(fields: [resourceId], references: [id])
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
+  resource   Resource? @relation(fields: [resourceId], references: [id])
 }
 
 model Pantry {
@@ -96,4 +95,10 @@ model CensusData {
   population   Int?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+enum Role {
+  DONOR
+  GOV
+  ADMIN
 }
