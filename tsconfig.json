@@ -29,6 +29,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-  ],
+, "src/utils/exportReport.tsx"  ],
   "exclude": ["node_modules", "Data Dashboard Design", "design_temp"]
 }

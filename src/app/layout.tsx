@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import GoogleMapsProvider from "@/components/providers/GoogleMapsProvider";
+import { ChatBot } from "@/components/TempBot";
 
 export const metadata: Metadata = {
   title: "Lemontree InsightEngine",
@@ -18,6 +19,8 @@ export default function RootLayout({
         <GoogleMapsProvider>
           {children}
         </GoogleMapsProvider>
+        {/* Floating ChatBot */}
+        <ChatBot />
       </body>
     </html>
   );

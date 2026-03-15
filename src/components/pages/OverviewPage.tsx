@@ -3,15 +3,13 @@
 import { useEffect, useState } from "react";
 import { useApp } from "@/components/layout/AppLayout";
 import { KPICard } from "@/components/dashboard/KPICard";
-import { GoogleMap, Marker, InfoWindow, Circle } from "@react-google-maps/api";
 import {
-  MapPin, Clock, AlertTriangle, Users, Star, BarChart3, TrendingDown, Maximize2, Search
+  MapPin, Clock, AlertTriangle, Users, Star, BarChart3, TrendingDown, ChevronRight, Search
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, PieChart, Pie, Legend,
 } from "recharts";
-import { OpenMapButton } from "@/components/dashboard/OpenMapButton";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Pantry = {
@@ -55,9 +53,6 @@ type TrendsData = {
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-const NYC_CENTER = { lat: 40.7306, lng: -73.9352 };
-const MAP_STYLE = { width: "100%", height: "100%" };
-const COVERAGE_RADIUS_M = 800;
 const TYPE_COLORS: Record<string, string> = {
   FOOD_PANTRY: "#2E7D32",
   SOUP_KITCHEN: "#42A5F5",
@@ -65,151 +60,100 @@ const TYPE_COLORS: Record<string, string> = {
 };
 const STATUS_COLORS = { PUBLISHED: "#2E7D32", UNAVAILABLE: "#EF5350" };
 
-// ── Filter options ─────────────────────────────────────────────────────────────
-const FILTER_OPTIONS = [
-  { value: "default",         label: "Default (by priority)" },
-  { value: "top_rated",       label: "Top Rated" },
-  { value: "needs_attention", label: "Needs Attention (low rating)" },
-  { value: "most_subscribed", label: "Most Subscribed" },
-  { value: "most_reviewed",   label: "Most Reviewed" },
-] as const;
-
-type FilterValue = typeof FILTER_OPTIONS[number]["value"];
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-function getMarkerIcon(badge?: string): any {
-  const colors: Record<string, string> = {
-    Excellent: "#2E7D32",
-    Good:      "#F9A825",
-    "At Risk": "#E53935",
-  };
-  const color = colors[badge ?? ""] ?? "#42A5F5";
-  return {
-    path: "M 0, 0 m -8, 0 a 8,8 0 1,0 16,0 a 8,8 0 1,0 -16,0",
-    fillColor: color,
-    fillOpacity: 0.9,
-    strokeColor: "#ffffff",
-    strokeWeight: 2,
-    scale: 0.8, // Slightly smaller for preview
-  };
-}
-
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
 /**
- * UPDATED: PantryMapCard now functions as an interactive preview box
- * clicking the map triggers navigation to the full map page.
+ * UPDATED: PantryMapCard - Clean CTA design with link to food resource map
  */
 function PantryMapCard() {
   const { setPage } = useApp();
-  const [pantries, setPantries] = useState<Pantry[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    setLoading(true);
-    fetch(`/api/map-data?filter=default`)
-      .then(r => r.json())
-      .then(d => setPantries(d.pantries?.slice(0, 40) || []))
-      .finally(() => setLoading(false));
-  }, []);
 
   return (
-    <div className="col-span-2 bg-card rounded-lg shadow-sm border border-gray-200 overflow-hidden flex flex-col group relative transition-all hover:border-primary/50">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 z-20 bg-white">
-        <div>
-          <h2 className="text-gray-900 font-bold flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-primary" />
-            Active Pantry Locations
-          </h2>
-          <p className="text-[11px] text-gray-400 mt-0.5">
-            Click map to enter full interactive resource view
-          </p>
-        </div>
-        <div className="bg-gray-50 p-2 rounded-lg group-hover:bg-primary/10 transition-colors">
-          <Maximize2 className="w-4 h-4 text-gray-400 group-hover:text-primary" />
-        </div>
+    <div className="col-span-2 bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col group relative transition-all hover:shadow-xl hover:border-primary/40">
+      <div className="absolute top-10 right-10 opacity-[0.03] pointer-events-none group-hover:scale-110 transition-transform duration-700">
+        <MapPin size={240} strokeWidth={1} />
       </div>
 
-      {/* Clickable Action Layer */}
-      <button 
-        onClick={() => setPage("map")} 
-        className="absolute inset-0 z-30 w-full h-full cursor-pointer flex items-center justify-center"
-        aria-label="Open full map"
-      >
-        <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 bg-black/5 absolute inset-0 flex items-center justify-center backdrop-blur-[1px]">
-          <div className="bg-white px-6 py-3 rounded-xl shadow-xl border border-gray-100 flex items-center gap-3 transform translate-y-4 group-hover:translate-y-0 transition-transform">
-            <Search className="w-4 h-4 text-primary" />
-            <span className="text-sm font-bold text-gray-900">Explore Interactive Map</span>
+      <div className="flex flex-col items-center justify-center h-full min-h-[320px] p-10 text-center space-y-8 relative z-10">
+        <div className="relative">
+          <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full scale-150 animate-pulse" />
+          <div className="bg-primary/10 p-5 rounded-3xl relative">
+            <MapPin className="w-12 h-12 text-primary" strokeWidth={2.5} />
           </div>
         </div>
-      </button>
+        
+        <div>
+          <h2 className="text-4xl font-black text-gray-900 tracking-tighter uppercase">
+            Active Pantry <span className="text-primary">Locations</span>
+          </h2>
+        </div>
 
-      {/* Visual Background Map */}
-      <div className="h-95 pointer-events-none grayscale-30 opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-500">
-        <GoogleMap
-          mapContainerStyle={MAP_STYLE}
-          center={NYC_CENTER}
-          zoom={11}
-          options={{ 
-            disableDefaultUI: true, 
-            gestureHandling: "none",
-            styles: [{ featureType: "all", elementType: "labels", stylers: [{ visibility: "off" }] }] 
-          }}
+        <button 
+          onClick={() => setPage("map")} 
+          className="group/btn bg-gray-900 text-[#FFCC10] px-10 py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center gap-3 hover:bg-black transition-all shadow-2xl hover:shadow-primary/40 border border-transparent hover:border-primary/30"
         >
-          {pantries.map((p) => (
-            <Marker
-              key={p.id}
-              position={{ lat: p.latitude, lng: p.longitude }}
-              icon={getMarkerIcon(p.badge)}
-            />
-          ))}
-        </GoogleMap>
+          <Search className="w-4 h-4" />
+          Enter Interactive Map
+          <ChevronRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
+        </button>
+        
+        <p className="text-[11px] text-gray-400 font-medium italic">
+          Click map to enter full interactive resource view
+        </p>
       </div>
     </div>
   );
 }
 
-function StatusCard({ insights }: { insights: Insights }) {
+/**
+ * UPDATED: StatusCard - Adjusted height and safety guards
+ */
+function StatusCard({ insights }: { insights: Insights | null }) {
+  if (!insights || !insights.summary) {
+    return (
+      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 h-[320px] animate-pulse flex items-center justify-center">
+        <div className="text-gray-300 font-bold uppercase tracking-widest text-xs">Loading Status...</div>
+      </div>
+    );
+  }
+
   const { published, unavailable, total } = insights.summary;
-  const publishedPct = Math.round((published / total) * 100);
-  const unavailablePct = Math.round((unavailable / total) * 100);
+  const publishedPct = total > 0 ? Math.round((published / total) * 100) : 0;
+  const unavailablePct = total > 0 ? Math.round((unavailable / total) * 100) : 0;
 
   return (
-    <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-6 flex flex-col gap-4">
-      <div>
-        <h3 className="text-gray-900 font-bold">Resource Status</h3>
-        <p className="text-xs text-gray-400 mt-0.5">Published vs unavailable</p>
+    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 flex flex-col min-h-[320px]">
+      <div className="mb-2">
+        <h3 className="text-gray-900 font-bold text-lg">Resource Status</h3>
+        <p className="text-[10px] text-gray-400 uppercase tracking-widest font-black">Live Coverage Breakdown</p>
       </div>
+      
       <div className="flex-1 flex items-center justify-center">
-        <ResponsiveContainer width="100%" height={180}>
+        <ResponsiveContainer width="100%" height={140}>
           <PieChart>
             <Pie
               data={[
                 { name: "Published", value: published },
                 { name: "Unavailable", value: unavailable },
               ]}
-              cx="50%"
-              cy="50%"
-              innerRadius={50}
-              outerRadius={75}
-              dataKey="value"
+              cx="50%" cy="50%" innerRadius={40} outerRadius={55} dataKey="value" paddingAngle={8}
             >
-              <Cell fill={STATUS_COLORS.PUBLISHED} />
-              <Cell fill={STATUS_COLORS.UNAVAILABLE} />
+              <Cell fill={STATUS_COLORS.PUBLISHED} stroke="none" />
+              <Cell fill={STATUS_COLORS.UNAVAILABLE} stroke="none" />
             </Pie>
-            <Tooltip formatter={(v) => [`${Number(v ?? 0).toLocaleString()} resources`, ""]} />
-            <Legend />
+            <Tooltip />
           </PieChart>
         </ResponsiveContainer>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-green-50 rounded-lg p-3 text-center">
-          <p className="text-2xl font-bold text-green-700">{publishedPct}%</p>
-          <p className="text-xs text-green-600 mt-0.5">Active</p>
+
+      <div className="grid grid-cols-2 gap-3 mt-4">
+        <div className="bg-green-50 rounded-2xl p-3 text-center border border-green-100">
+          <p className="text-2xl font-black text-green-700">{publishedPct}%</p>
+          <p className="text-[9px] font-bold text-green-600 uppercase">Active</p>
         </div>
-        <div className="bg-red-50 rounded-lg p-3 text-center">
-          <p className="text-2xl font-bold text-red-600">{unavailablePct}%</p>
-          <p className="text-xs text-red-500 mt-0.5">Unavailable</p>
+        <div className="bg-red-50 rounded-2xl p-3 text-center border border-red-100">
+          <p className="text-2xl font-black text-red-600">{unavailablePct}%</p>
+          <p className="text-[9px] font-bold text-red-500 uppercase">Gap</p>
         </div>
       </div>
     </div>
@@ -232,7 +176,7 @@ function RatingChart({
         </p>
       </div>
       <ResponsiveContainer width="100%" height={200}>
-        <BarChart data={data} barSize={32}>
+        <BarChart data={data || []} barSize={32}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
           <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="#9ca3af" />
           <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" />
@@ -241,7 +185,7 @@ function RatingChart({
             contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb" }}
           />
           <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-            {data.map((_, i) => (
+            {(data || []).map((_, i) => (
               <Cell key={i} fill={i < 2 ? "#EF5350" : i < 4 ? "#FFA726" : "#2E7D32"} />
             ))}
           </Bar>
@@ -267,7 +211,7 @@ function WaitTimeChart({
         </p>
       </div>
       <ResponsiveContainer width="100%" height={200}>
-        <BarChart data={data} barSize={40}>
+        <BarChart data={data || []} barSize={40}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
           <XAxis dataKey="bucket" tick={{ fontSize: 11 }} stroke="#9ca3af" />
           <YAxis tick={{ fontSize: 11 }} stroke="#9ca3af" />
@@ -298,7 +242,7 @@ function TypeBreakdownChart({
         </p>
       </div>
       <ResponsiveContainer width="100%" height={200}>
-        <BarChart data={data} layout="vertical" barSize={20}>
+        <BarChart data={data || []} layout="vertical" barSize={20}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
           <XAxis type="number" tick={{ fontSize: 11 }} stroke="#9ca3af" />
           <YAxis
@@ -313,7 +257,7 @@ function TypeBreakdownChart({
             contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb" }}
           />
           <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-            {data.map((d, i) => (
+            {(data || []).map((d, i) => (
               <Cell key={i} fill={TYPE_COLORS[d.type] ?? "#9ca3af"} />
             ))}
           </Bar>
@@ -323,7 +267,6 @@ function TypeBreakdownChart({
   );
 }
 
-// ── Role-specific chart sections ───────────────────────────────────────────────
 function ChartSkeleton() {
   return (
     <div className="grid grid-cols-3 gap-6">
@@ -368,7 +311,7 @@ function InternalCharts({ insights }: { insights: Insights }) {
           </div>
         </div>
         <div className="divide-y divide-gray-100">
-          {(activeTable === "subscribers" ? insights.topBySubscribers : insights.topByReviews).map((p, i) => (
+          {((activeTable === "subscribers" ? insights.topBySubscribers : insights.topByReviews) || []).map((p, i) => (
             <div key={i} className="px-6 py-3 flex items-center gap-4 hover:bg-gray-50 transition-colors">
               <span className="text-sm font-bold text-gray-300 w-5 shrink-0">{i + 1}</span>
               <div className="flex-1 min-w-0">
@@ -444,7 +387,7 @@ function DonorCharts({
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <div className="h-55 bg-gray-100 rounded animate-pulse" />
+          <div className="h-[220px] bg-gray-100 rounded animate-pulse" />
         )}
       </div>
       <div className="grid grid-cols-2 gap-6">
@@ -537,7 +480,7 @@ function GovernmentCharts({
               <Bar dataKey="unavailable" name="Unavailable" fill="#EF5350" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        ) : <div className="h-60 bg-gray-100 rounded animate-pulse" />}
+        ) : <div className="h-[240px] bg-gray-100 rounded animate-pulse" />}
       </div>
       <div className="grid grid-cols-2 gap-6">
         <RatingChart data={insights.ratingDistribution} />
@@ -578,7 +521,7 @@ function ProviderCharts({
                 <Bar dataKey="avgRating" fill="#2E7D32" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          ) : <div className="h-50 bg-gray-100 rounded animate-pulse" />}
+          ) : <div className="h-[200px] bg-gray-100 rounded animate-pulse" />}
         </div>
         <TypeBreakdownChart data={insights.typeBreakdown} />
         <div className="bg-card rounded-lg shadow-sm border border-gray-200 p-4">
@@ -618,45 +561,44 @@ function RoleCharts({
   }
 }
 
-function KPIs({ role, insights, totalPantries }: {
-  role: string | undefined;
-  insights: Insights | null;
-  totalPantries: number;
-}) {
-  if (!insights) return <div className="col-span-4 h-24 bg-gray-50 rounded-lg animate-pulse" />;
+function KPIs({ role, insights }: { role: string | undefined; insights: any }) {
+  if (!insights || !insights.summary) {
+    return <div className="col-span-4 h-24 bg-gray-50 rounded-lg animate-pulse" />;
+  }
   const { summary } = insights;
-  const gap = Math.round((summary.unavailable / summary.total) * 100);
+  const total = summary.total || 0;
+  const unavailable = summary.unavailable || 0;
+  const gap = total > 0 ? Math.round((unavailable / total) * 100) : 0;
 
   const governmentKPIs = [
-    { title: "Total Resources Mapped", value: summary.total.toLocaleString(), icon: MapPin, subtitle: "NYC Metro area" },
-    { title: "Service Gaps", value: `${gap}%`, icon: TrendingDown, subtitle: `${summary.unavailable.toLocaleString()} unavailable` },
-    { title: "Avg Community Rating", value: summary.avgRating.toFixed(2), icon: BarChart3, subtitle: "Out of 5.0" },
-    { title: "Engagement", value: summary.hasSubscribers.toLocaleString(), icon: Users, subtitle: "Active followers" },
+    { title: "Total Resources Mapped", value: total.toLocaleString(), icon: MapPin, subtitle: "NYC Metro area" },
+    { title: "Service Gaps", value: `${gap}%`, icon: TrendingDown, subtitle: `${unavailable.toLocaleString()} unavailable` },
+    { title: "Avg Community Rating", value: (summary.avgRating || 0).toFixed(2), icon: BarChart3, subtitle: "Out of 5.0" },
+    { title: "Engagement", value: (summary.hasSubscribers || 0).toLocaleString(), icon: Users, subtitle: "Active followers" },
   ];
 
   const defaultKPIs = [
-    { title: "Published Resources", value: summary.published.toLocaleString(), icon: MapPin, subtitle: "Active on map" },
+    { title: "Published Resources", value: (summary.published || 0).toLocaleString(), icon: MapPin, subtitle: "Active on map" },
     { title: "Gap", value: `${gap}%`, icon: AlertTriangle, subtitle: "Need review" },
-    { title: "Rating", value: summary.avgRating.toFixed(2), icon: Star, subtitle: "Avg score" },
-    { title: "Wait Time", value: `${summary.medianWaitMinutes} min`, icon: Clock, subtitle: "Median" },
+    { title: "Rating", value: (summary.avgRating || 0).toFixed(2), icon: Star, subtitle: "Avg score" },
+    { title: "Wait Time", value: `${summary.medianWaitMinutes || 0} min`, icon: Clock, subtitle: "Median" },
   ];
 
   const activeKPIs = role === "government" ? governmentKPIs : defaultKPIs;
-
-  return (
-    <>
-      {activeKPIs.map((k, i) => <KPICard key={i} {...k} />)}
-    </>
-  );
+  return <>{activeKPIs.map((k, i) => <KPICard key={i} {...k} />)}</>;
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export function OverviewPage() {
   const { role } = useApp();
+  const [totalPantries, setTotalPantries] = useState(0);
   const [insights, setInsights] = useState<Insights | null>(null);
   const [trends, setTrends] = useState<TrendsData | null>(null);
 
   useEffect(() => {
+    fetch("/api/map-data").then(r => r.json()).then(d => {
+      setTotalPantries(d.totalPantries ?? d.pantries?.length ?? 0);
+    });
     fetch("/api/insights").then(r => r.json()).then(setInsights);
     fetch("/api/trends").then(r => r.json()).then(d => {
       setTrends({ boroughs: d.boroughs ?? [], topEngaged: d.topEngaged ?? [] });
@@ -665,15 +607,15 @@ export function OverviewPage() {
 
   return (
     <div className="space-y-6">
+      {/* 1. Top KPI Cards Row */}
       <div className="grid grid-cols-4 gap-6">
-        <KPIs role={role} insights={insights} totalPantries={insights?.summary?.total ?? 0} />
+        <KPIs role={role} insights={insights} />
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        <PantryMapCard />
-        {insights && <StatusCard insights={insights} />}
-      </div>
+      {/* REMOVED: The grid containing PantryMapCard and StatusCard 
+      */}
 
+      {/* 2. Role-Specific Charts (System Health, Donor Intelligence, etc.) */}
       <RoleCharts role={role} insights={insights} trends={trends} />
     </div>
   );
