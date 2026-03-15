@@ -6,6 +6,7 @@ import {
   PanelLeftClose, PanelLeftOpen, Table2, BarChart3, ChevronDown,
   LogOut, ShieldCheck, Heart, Building2, Users
 } from "lucide-react";
+import { ChatBot } from "@/components/TempBot";
 
 // --- TYPES ---
 export type UserRole = "internal" | "client" | "government" | "donor" | "provider";
@@ -27,15 +28,7 @@ const PERMISSIONS: Record<UserRole, PageId[]> = {
   donor: ["overview", "map", "analytics", "table"],
 };
 
-// --- STARTING PAGES FOR DIRECT LINKING ---
-const STARTING_PAGES: Record<UserRole, PageId> = {
-  internal: "overview",
-  client: "map",
-  government: "overview",
-  donor: "analytics",
-  provider: "overview",
-};
-
+// UPDATED: Order defined here determines dropdown order
 const roleLabels: Record<UserRole, string> = {
   internal: "Lemontree Team",
   client: "Community Member",
@@ -230,6 +223,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
             {children}
           </div>
         </main>
+
+        <ChatBot />
       </div>
     </AppContext.Provider>
   );
