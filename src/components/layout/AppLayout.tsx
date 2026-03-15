@@ -3,10 +3,10 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import {
   LayoutDashboard, MapPin, FileText, TrendingUp,
-  Apple, AlertTriangle, Settings, ChevronDown, User, Leaf, PanelLeftClose, PanelLeftOpen, Table2, Star,
+  Apple, AlertTriangle, Settings, ChevronDown, User, Leaf, PanelLeftClose, PanelLeftOpen, Table2, Star, Camera, MessageSquare,
 } from "lucide-react";
 
-export type UserRole = "internal" | "government" | "donor" | "provider";
+export type UserRole = "internal" | "government" | "donor" | "provider" | "client";
 export type PageId = "overview" | "map" | "reports" | "trends" | "reliability" | "availability" | "issues" | "settings" | "table";
 
 interface AppContextType {
@@ -29,6 +29,7 @@ const roleLabels: Record<UserRole, string> = {
   government: "Government Agency",
   donor: "Donor / Foundation",
   provider: "Food Provider",
+  client: "Client",
 };
 
 const navItems: { id: PageId; label: string; icon: React.ElementType }[] = [
@@ -43,12 +44,20 @@ const navItems: { id: PageId; label: string; icon: React.ElementType }[] = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-function Sidebar({ page, setPage, collapsed, setCollapsed }: {
+const clientNavItems: { id: PageId; label: string; icon: React.ElementType }[] = [
+  { id: "overview", label: "Home", icon: LayoutDashboard },
+  { id: "map", label: "Find Food", icon: MapPin },
+];
+
+function Sidebar({ page, setPage, collapsed, setCollapsed, role }: {
   page: PageId;
   setPage: (p: PageId) => void;
   collapsed: boolean;
   setCollapsed: (v: boolean) => void;
+  role: UserRole;
 }) {
+  const items = role === "client" ? clientNavItems : navItems;
+
   return (
     <aside className={`${collapsed ? "w-16" : "w-64"} bg-card border-r border-gray-200 flex flex-col fixed left-0 top-16 bottom-0 z-20 transition-all duration-300`}>
       <div className={`p-4 border-b border-gray-200 flex items-center ${collapsed ? "justify-center" : "justify-between"}`}>
@@ -62,7 +71,7 @@ function Sidebar({ page, setPage, collapsed, setCollapsed }: {
       </div>
       <nav className="flex-1 overflow-y-auto p-2">
         <div className="space-y-1">
-          {navItems.map((item) => {
+          {items.map((item) => {
             const Icon = item.icon;
             const isActive = page === item.id;
             return (
@@ -148,7 +157,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <img src="/lemontreeText.png" alt="Lemontree Text" className="h-full w-auto object-contain" />
           </div>
         </div>
-        <Sidebar page={page} setPage={setPage} collapsed={collapsed} setCollapsed={setCollapsed} />
+        <Sidebar page={page} setPage={setPage} collapsed={collapsed} setCollapsed={setCollapsed} role={role} />
         <TopNav role={role} setRole={setRole} collapsed={collapsed} />
         <main className={`${collapsed ? "ml-16" : "ml-64"} pt-32 transition-all duration-300`}>
           <div className="p-8">

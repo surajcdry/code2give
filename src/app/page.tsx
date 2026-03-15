@@ -10,9 +10,15 @@ import { SettingsPage } from "@/components/pages/SettingsPage";
 import { DataTablePage } from "@/components/pages/DataTablePage";
 import { FoodAvailabilityPage } from "@/components/pages/FoodAvailabilityPage";
 import { ReliabilityPage } from "@/components/pages/ReliabilityPage";
+import { ClientPage } from "@/components/pages/ClientPage";
 
 function PageContent() {
-  const { page } = useApp();
+  const { page, role } = useApp();
+
+  if (role === "client") {
+    if (page === "map") return <FoodResourceMapPage />;
+    return <ClientPage />;
+  }
 
   switch (page) {
     case "overview":
