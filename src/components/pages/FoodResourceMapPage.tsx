@@ -11,7 +11,7 @@ import type { Pantry, SortOption } from "./FoodResourceMap/types";
 import {
   DEFAULT_CENTER, DEFAULT_ZOOM, MIN_FETCH_ZOOM, MIN_MAP_ZOOM, MAX_MARKERS,
   MILES_TO_METERS, RADIUS_OPTIONS, TYPE_LABELS, FOOD_TAGS,
-  SORT_OPTIONS, GAP_COLORS, POVERTY_COLORS,
+  SORT_OPTIONS, GAP_COLORS, POVERTY_COLORS, ARCHETYPE_LEGEND, ARCHETYPE_DOT_COLORS,
 } from "./FoodResourceMap/constants";
 import {
   povertyDotColor, distanceMiles, getMarkerIcon, gapFillColor, getZipFromFeature, exportToCSV, ratingColor,
@@ -22,6 +22,7 @@ import { PantryCard } from "./FoodResourceMap/PantryCard";
 import { useZipStats } from "./FoodResourceMap/useZipStats";
 import { useServiceGapGeoJson } from "./FoodResourceMap/useServiceGapGeoJson";
 import { useTractCentroids } from "./FoodResourceMap/useTractCentroids";
+import { useArchetypePoints } from "./FoodResourceMap/useArchetypePoints";
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export function FoodResourceMapPage() {
@@ -43,6 +44,7 @@ export function FoodResourceMapPage() {
   const abortRef    = useRef<AbortController | null>(null);
 
   const [showServiceGapLayer, setShowServiceGapLayer] = useState(false);
+  const [showArchetypeLayer, setShowArchetypeLayer]   = useState(false);
   const zipStats = useZipStats();
   const geoJson  = useServiceGapGeoJson(showServiceGapLayer);
   const [zipInfoWindow, setZipInfoWindow]             = useState<{ lat: number; lng: number; content: string; title: string } | null>(null);
@@ -50,6 +52,7 @@ export function FoodResourceMapPage() {
 
   const [showTractLayer, setShowTractLayer] = useState(false);
   const tractCentroids = useTractCentroids(showTractLayer);
+  const archetypePoints = useArchetypePoints(showArchetypeLayer);
 
   const [legendFilter, setLegendFilter] = useState<Set<string>>(new Set(["Excellent", "Good", "At Risk"]));
 
@@ -271,6 +274,79 @@ export function FoodResourceMapPage() {
     return () => { overlay.setMap(null); };
   }, [mapInstance, showTractLayer, tractCentroids]);
 
+  // Canvas overlay for archetype clusters
+  useEffect(() => {
+    if (!mapInstance || !showArchetypeLayer || archetypePoints.length === 0) return;
+
+    class ArchetypeOverlay extends google.maps.OverlayView {
+      private canvas = document.createElement("canvas");
+
+      onAdd() {
+        this.canvas.style.position = "absolute";
+        this.canvas.style.pointerEvents = "none";
+        this.getPanes()!.overlayLayer.appendChild(this.canvas);
+      }
+
+      draw() {
+        const proj = this.getProjection();
+        if (!proj) return;
+        const map = this.getMap() as google.maps.Map;
+        const w = map.getDiv().offsetWidth;
+        const h = map.getDiv().offsetHeight;
+        const center = map.getCenter()!;
+        const centerPx = proj.fromLatLngToDivPixel(center)!;
+
+        const zoom = map.getZoom() ?? 10;
+        const r    = Math.max(5, Math.min(25, zoom - 4));
+        const blur = Math.round(r * 2.5);
+        const pad  = blur * 3;
+
+        const totalW = w + pad * 2;
+        const totalH = h + pad * 2;
+
+        this.canvas.width  = totalW;
+        this.canvas.height = totalH;
+        this.canvas.style.left = `${centerPx.x - w / 2 - pad}px`;
+        this.canvas.style.top  = `${centerPx.y - h / 2 - pad}px`;
+
+        const originX = centerPx.x - w / 2 - pad;
+        const originY = centerPx.y - h / 2 - pad;
+
+        const ctx = this.canvas.getContext("2d")!;
+        ctx.clearRect(0, 0, totalW, totalH);
+        ctx.filter = `blur(${blur}px)`;
+
+        const buckets: Record<number, [number, number][]> = {};
+        for (const [lat, lng, archetypeId] of archetypePoints) {
+          const pt = proj.fromLatLngToDivPixel(new google.maps.LatLng(lat, lng));
+          if (!pt) continue;
+          const cx = pt.x - originX;
+          const cy = pt.y - originY;
+          if (cx < -r || cx > totalW + r || cy < -r || cy > totalH + r) continue;
+          (buckets[archetypeId] ??= []).push([cx, cy]);
+        }
+
+        ctx.globalAlpha = Math.min(0.8, 0.35 + (zoom - 7) * 0.05);
+        for (const [archetypeId, pts] of Object.entries(buckets)) {
+          const color = ARCHETYPE_DOT_COLORS[Number(archetypeId)] ?? "#6b7280";
+          ctx.beginPath();
+          for (const [cx, cy] of pts) {
+            ctx.moveTo(cx + r, cy);
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          }
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
+      }
+
+      onRemove() { this.canvas.remove(); }
+    }
+
+    const overlay = new ArchetypeOverlay();
+    overlay.setMap(mapInstance);
+    return () => { overlay.setMap(null); };
+  }, [mapInstance, showArchetypeLayer, archetypePoints]);
+
   // ── Derived state ─────────────────────────────────────────────────────────
 
   // List never clears — shows initial load, updated only when marker clicked
@@ -357,7 +433,7 @@ export function FoodResourceMapPage() {
   };
 
   const resetAll = () => {
-    clearAllFilters(); setShowServiceGapLayer(false); setShowTractLayer(false); setShowFilters(false);
+    clearAllFilters(); setShowServiceGapLayer(false); setShowTractLayer(false); setShowFilters(false); setShowArchetypeLayer(false);
     setSortBy("default"); setZipInfoWindow(null); handleClearSearch();
     setLegendFilter(new Set(["Excellent", "Good", "At Risk"]));
   };
@@ -479,6 +555,14 @@ export function FoodResourceMapPage() {
             }`}>
             <span className={`w-3 h-3 rounded-sm inline-block border ${showTractLayer ? "bg-purple-600 border-purple-700" : "bg-gray-200 border-gray-300"}`} />
             Equity Gap Index
+          </button>
+
+          <button onClick={() => setShowArchetypeLayer(v => !v)}
+            className={`flex items-center gap-2 h-8 px-3 rounded-lg border text-xs font-semibold transition-colors ${
+              showArchetypeLayer ? "bg-violet-100 border-violet-400 text-violet-900" : "bg-white border-gray-200 text-gray-600 hover:border-violet-300"
+            }`}>
+            <span className={`w-3 h-3 rounded-sm inline-block border ${showArchetypeLayer ? "bg-violet-600 border-violet-700" : "bg-gray-200 border-gray-300"}`} />
+            Archetype Layer
           </button>
 
           {searchCenter && (
@@ -678,13 +762,18 @@ export function FoodResourceMapPage() {
 
             {mapMarkers.map(p => (
               <Marker key={p.id} position={{ lat: p.latitude, lng: p.longitude }}
-                icon={getMarkerIcon(p.badge, p.ratingAverage, selectedPantry?.id === p.id)}
+                icon={getMarkerIcon(p.badge, p.ratingAverage, selectedPantry?.id === p.id, p.archetypeName, showArchetypeLayer)}
                 onClick={() => handleMarkerClick(p)}>
                 {selectedPantry?.id === p.id && (
                   <InfoWindow position={{ lat: p.latitude, lng: p.longitude }} onCloseClick={() => { setSelectedPantry(null); setSelectionSource(null); }}>
                     <div className="w-52 text-sm">
                       <p className="font-semibold text-gray-900 mb-1">{p.name}</p>
                       <p className="text-xs text-gray-500 mb-1">{p.location}</p>
+                      {p.archetypeName && (
+                        <span className="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-800 mb-1">
+                          {p.archetypeName}
+                        </span>
+                      )}
                       {p.isOpenNow !== undefined && (
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${p.isOpenNow ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                           {p.isOpenNow ? "● Open Now" : "Closed"}
@@ -794,6 +883,20 @@ export function FoodResourceMapPage() {
                   </div>
                 ))}
                 <p className="text-[9px] text-slate-400 mt-1.5 leading-relaxed">% population with economic insecurity</p>
+              </>
+            )}
+
+            {showArchetypeLayer && (
+              <>
+                <div className="my-2.5 border-t border-gray-200" />
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Resource Archetypes</p>
+                {ARCHETYPE_LEGEND.map(({ label, color }) => (
+                  <div key={label} className="flex items-center gap-2 mb-1.5">
+                    <span className="w-3 h-3 rounded-full shrink-0 border border-white shadow-sm" style={{ backgroundColor: color }} />
+                    <span className="text-[10px] text-slate-600">{label}</span>
+                  </div>
+                ))}
+                <p className="text-[9px] text-slate-400 mt-1.5 leading-relaxed">GNN-derived community need clusters</p>
               </>
             )}
           </div>

@@ -1,5 +1,7 @@
 // src/lib/services/map.ts
 
+import pool from "@/lib/db/pool";
+
 const API_BASE = "https://platform.foodhelpline.org";
 
 // ---- Types ----------------------------------------------------------------
@@ -168,13 +170,34 @@ export async function getMapData(_filter = "default", bounds?: MapBounds | null)
       };
     });
 
-  // List — use the full detail resources (top 100 nearest, all have names)
-  const listResources = Array.from(detailMap.values());
+  // Enrich with GNN archetype data from our Supabase DB
+  const ids = markers.map(m => m.id);
+  const archetypeMap = new Map<string, { archetypeId: number; archetypeName: string }>();
+  if (ids.length > 0) {
+    try {
+      const { rows } = await pool.query<{ id: string; archetypeId: number; archetypeName: string }>(
+        `SELECT id, "archetypeId", "archetypeName" FROM "Resource"
+         WHERE id = ANY($1) AND "archetypeId" IS NOT NULL`,
+        [ids],
+      );
+      for (const row of rows) archetypeMap.set(row.id, { archetypeId: row.archetypeId, archetypeName: row.archetypeName });
+    } catch (e) {
+      console.warn("[map] archetype fetch failed:", e);
+    }
+  }
+
+  // List — use the full detail resources (top 100 nearest, all have names), enriched with archetype
+  const listResources = Array.from(detailMap.values()).map(r => {
+    const archetype = archetypeMap.get(r.id);
+    return archetype ? { ...r, ...archetype } : r;
+  });
 
   // Merge: for markers that have detail, use enriched data; rest are pin-only
   const pantries = markers.map(m => {
     const detail = detailMap.get(m.id);
-    return detail ?? m;
+    const archetype = archetypeMap.get(m.id);
+    const base = detail ?? m;
+    return archetype ? { ...base, ...archetype } : base;
   });
 
   return { pantries, listResources, totalPantries: pantries.length, censusStats: [] };

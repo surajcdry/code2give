@@ -41,6 +41,32 @@ export const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "open_now", label: "Open now first" },
 ];
 
+// GNN-derived archetype colors — keyed by name as assigned by the ML pipeline (K=5)
+export const ARCHETYPE_COLORS: Record<string, string> = {
+  "Critical Desert":    "#6A1B9A",
+  "Stressed Hub":       "#C62828",
+  "Low-Need Isolated":  "#F9A825",
+  "Urban Core Cluster": "#1565C0",
+  "Well-Served Suburban": "#2E7D32",
+};
+
+// archetypeId → hex color, keyed by integer id as output by the ML pipeline (K=5)
+export const ARCHETYPE_DOT_COLORS: Record<number, string> = {
+  0: "#6A1B9A",  // Critical Desert
+  1: "#C62828",  // Stressed Hub
+  2: "#F9A825",  // Low-Need Isolated
+  3: "#1565C0",  // Urban Core Cluster
+  4: "#2E7D32",  // Well-Served Suburban
+};
+
+export const ARCHETYPE_LEGEND = [
+  { id: 0, label: "Critical Desert",    color: "#6A1B9A" },
+  { id: 1, label: "Stressed Hub",       color: "#C62828" },
+  { id: 2, label: "Low-Need Isolated",  color: "#F9A825" },
+  { id: 3, label: "Urban Core Cluster", color: "#1565C0" },
+  { id: 4, label: "Well-Served Suburban", color: "#2E7D32" },
+];
+
 export const GAP_COLORS = [
   { label: "Critical ≥80%",    color: "#B71C1C", min: 80 },
   { label: "High 50–79%",      color: "#EF5350", min: 50 },

@@ -61,3 +61,4 @@ ml/output/*
 .vscode/*
 
 data/CensusData.csv
+data/Resource.csv

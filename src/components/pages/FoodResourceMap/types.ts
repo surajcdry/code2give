@@ -9,6 +9,8 @@ export type Pantry = {
   resourceTypeId?: string;
   reliabilityScore?: number;
   badge?: string;
+  archetypeId?: number | null;
+  archetypeName?: string | null;
   phone?: string;
   website?: string;
   notes?: string;

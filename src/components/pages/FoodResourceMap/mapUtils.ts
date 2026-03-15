@@ -1,4 +1,4 @@
-import { TYPE_LABELS, MARKER_COLORS } from "./constants";
+import { TYPE_LABELS, MARKER_COLORS, ARCHETYPE_COLORS } from "./constants";
 import type { Pantry } from "./types";
 
 export function povertyDotColor(w: number): string {
@@ -20,11 +20,22 @@ export function resolveHours(hours?: string) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getMarkerIcon(badge?: string, rating?: number | null, selected = false): any {
-  const effectiveBadge = rating != null
-    ? rating >= 2.5 ? "Excellent" : rating >= 1.5 ? "Good" : "At Risk"
-    : badge;
-  const color = MARKER_COLORS[effectiveBadge ?? ""] ?? "#42A5F5";
+export function getMarkerIcon(
+  badge?: string,
+  rating?: number | null,
+  selected = false,
+  archetypeName?: string | null,
+  showArchetypes = false,
+): any {
+  let color: string;
+  if (showArchetypes && archetypeName) {
+    color = ARCHETYPE_COLORS[archetypeName] ?? "#42A5F5";
+  } else {
+    const effectiveBadge = rating != null
+      ? rating >= 2.5 ? "Excellent" : rating >= 1.5 ? "Good" : "At Risk"
+      : badge;
+    color = MARKER_COLORS[effectiveBadge ?? ""] ?? "#42A5F5";
+  }
   return {
     path: "M 0,0 m -8,0 a 8,8 0 1,0 16,0 a 8,8 0 1,0 -16,0",
     fillColor: color, fillOpacity: 0.9,
