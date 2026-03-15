@@ -1,21 +1,50 @@
+// src/app/api/map-data/route.ts
+
 import { NextResponse } from "next/server";
-import { getMapData } from "@/lib/services/map";
+import { getMapData, getResourceDetails } from "@/lib/services/map";
+
+function parseNumber(value: string | null): number | null {
+  if (value == null) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const filter = searchParams.get("filter") ?? "default";
-    const data = await getMapData(filter);
+
+    // Single resource detail lookup
+    const resourceId = searchParams.get("id");
+    if (resourceId) {
+      const pantry = await getResourceDetails(resourceId);
+      return NextResponse.json({ pantry });
+    }
+
+    // Bounds-based marker fetch
+    const north = parseNumber(searchParams.get("north"));
+    const south = parseNumber(searchParams.get("south"));
+    const east  = parseNumber(searchParams.get("east"));
+    const west  = parseNumber(searchParams.get("west"));
+
+    if (north == null || south == null || east == null || west == null) {
+      return NextResponse.json(
+        { error: "Missing bounds", pantries: [], totalPantries: 0, censusStats: [] },
+        { status: 400 }
+      );
+    }
+
+    const data = await getMapData("default", { north, south, east, west });
 
     return NextResponse.json({
-      pantries: data.pantries,
+      pantries:      data.pantries,
+      listResources: data.listResources,
       totalPantries: data.totalPantries,
-      censusStats: data.censusStats,
+      censusStats:   data.censusStats,
     });
   } catch (error) {
     console.error("Error fetching map data:", error);
     return NextResponse.json(
-      { error: "Failed to fetch map data", pantries: [], censusStats: [] },
+      { error: "Failed to fetch map data", pantries: [], totalPantries: 0, censusStats: [] },
       { status: 500 }
     );
   }

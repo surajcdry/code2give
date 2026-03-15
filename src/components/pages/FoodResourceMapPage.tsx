@@ -1,12 +1,13 @@
 "use client";
+// src/components/pages/FoodResourceMapPage.tsx
 
-import { useEffect, useState, useRef } from "react";
 import {
   MapPin, Clock, Search, X, ExternalLink, Phone,
   Navigation, Download, Timer, Filter, LocateFixed, AlertCircle, Star,
 } from "lucide-react";
 import { GoogleMap, Marker, Circle, InfoWindow } from "@react-google-maps/api";
 import { Button } from "@/components/ui/Button";
+import { useEffect, useState, useRef, useCallback } from "react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Pantry = {
@@ -41,7 +42,14 @@ type Pantry = {
 type ZipStat = { total: number; published: number; unavailable: number; pctUnavailable: number };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const DEFAULT_CENTER  = { lat: 40.73061, lng: -73.935242 };
+// Start in NYC so markers are visible immediately on load
+const DEFAULT_CENTER  = { lat: 40.7128, lng: -74.006 };
+const DEFAULT_ZOOM    = 13;
+// Don't fetch when zoomed out further than this — bounding box too large for API
+const MIN_FETCH_ZOOM  = 13; // Only fetch markers at neighborhood level or closer
+const MIN_MAP_ZOOM    = 4;  // Allow zooming out to national view to navigate
+const MAX_MARKERS     = 300; // Cap rendered pins to keep the map responsive
+
 const MILES_TO_METERS = 1609.34;
 const RADIUS_OPTIONS  = [0.5, 1, 2, 5, 10];
 
@@ -176,7 +184,6 @@ function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose: () => 
 
   return (
     <div className="rounded-xl border-2 border-primary bg-white shadow-lg overflow-hidden">
-      {/* Header */}
       <div className="bg-primary/10 px-4 py-3 flex items-start justify-between gap-2 border-b border-primary/20">
         <div className="flex-1 min-w-0">
           <p className="text-[10px] font-bold uppercase tracking-widest text-primary/70 mb-0.5">{typeLabel}</p>
@@ -195,8 +202,6 @@ function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose: () => 
       </div>
 
       <div className="px-4 py-3 space-y-3 text-sm">
-
-        {/* Stat grid: rating + wait */}
         {(pantry.ratingAverage != null || pantry.waitTimeMinutesAverage != null) && (
           <div className="grid grid-cols-2 gap-2">
             {pantry.ratingAverage != null && (
@@ -230,7 +235,6 @@ function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose: () => 
           </div>
         )}
 
-        {/* Community pills */}
         {(pantry.subscriberCount != null || pantry.acceptingNewClients != null || pantry.appointmentRequired != null) && (
           <div className="flex flex-wrap gap-1.5">
             {pantry.subscriberCount != null && (
@@ -256,7 +260,6 @@ function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose: () => 
           </div>
         )}
 
-        {/* Address */}
         <div className="flex gap-2.5">
           <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
           <div>
@@ -272,7 +275,6 @@ function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose: () => 
           </div>
         </div>
 
-        {/* Hours */}
         <div className="flex gap-2.5">
           <Clock className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
           <div>
@@ -281,7 +283,6 @@ function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose: () => 
           </div>
         </div>
 
-        {/* Phone */}
         {pantry.phone && (
           <div className="flex gap-2.5">
             <Phone className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
@@ -292,7 +293,6 @@ function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose: () => 
           </div>
         )}
 
-        {/* Website */}
         {pantry.website && (
           <div className="flex gap-2.5">
             <ExternalLink className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
@@ -306,7 +306,6 @@ function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose: () => 
           </div>
         )}
 
-        {/* Description */}
         {pantry.description && (
           <div className="flex gap-2.5">
             <Navigation className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
@@ -317,7 +316,6 @@ function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose: () => 
           </div>
         )}
 
-        {/* Cultural + language tags */}
         {((pantry.culturalTags?.length ?? 0) > 0 || (pantry.languages?.length ?? 0) > 0) && (
           <div>
             <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Tags</p>
@@ -332,7 +330,6 @@ function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose: () => 
           </div>
         )}
 
-        {/* Notes */}
         {pantry.notes && (
           <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
             <p className="text-[11px] font-bold text-amber-700 mb-0.5">Note</p>
@@ -340,7 +337,6 @@ function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose: () => 
           </div>
         )}
 
-        {/* Published status */}
         <div className="flex items-center gap-1.5 pt-1 border-t border-gray-100">
           <span className={`w-1.5 h-1.5 rounded-full ${pantry.isPublished !== false ? "bg-green-500" : "bg-gray-300"}`} />
           <span className="text-[11px] text-gray-400">
@@ -349,7 +345,6 @@ function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose: () => 
         </div>
       </div>
 
-      {/* Footer CTA */}
       <div className="px-4 pb-4">
         <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
           <Button variant="default" size="sm" className="w-full gap-1.5 h-8">
@@ -374,7 +369,9 @@ function PantryCard({ pantry, selected, distance, onSelect }: {
         ${selected ? "border-primary bg-primary/5 shadow-md" : "border-gray-200 bg-white hover:border-gray-300"}`}>
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1 min-w-0">
-          <h4 className="font-semibold text-gray-900 text-sm leading-snug truncate">{pantry.name}</h4>
+          <h4 className="font-semibold text-gray-900 text-sm leading-snug truncate">
+            {pantry.name || TYPE_LABELS[pantry.resourceTypeId ?? ""] || "Food Resource"}
+          </h4>
           {pantry.resourceTypeId && (
             <p className="text-[11px] text-gray-400 mt-0.5">{TYPE_LABELS[pantry.resourceTypeId] ?? pantry.resourceTypeId}</p>
           )}
@@ -392,7 +389,10 @@ function PantryCard({ pantry, selected, distance, onSelect }: {
       </div>
 
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 mb-2.5">
-        <span className="flex items-center gap-1 truncate"><MapPin className="w-3 h-3 shrink-0" />{pantry.location}</span>
+        <span className="flex items-center gap-1 truncate">
+          <MapPin className="w-3 h-3 shrink-0" />
+          {pantry.location || "Click to load address"}
+        </span>
         {distance !== null && (
           <span className="flex items-center gap-1 text-indigo-600 font-medium shrink-0">
             <Navigation className="w-3 h-3" />{distance.toFixed(1)} mi
@@ -444,14 +444,22 @@ function PantryCard({ pantry, selected, distance, onSelect }: {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export function FoodResourceMapPage() {
-  const [allPantries, setAllPantries]       = useState<Pantry[]>([]);
-  const [loading, setLoading]               = useState(false);
+  const [allPantries, setAllPantries]         = useState<Pantry[]>([]);
+  const [listPantries, setListPantries]       = useState<Pantry[]>([]); // never clears — only updates on first load or click
+  const [defaultPantries, setDefaultPantries] = useState<Pantry[]>([]);
+  const [lastClicked, setLastClicked]         = useState<Pantry | null>(null);
+  const [loading, setLoading]                 = useState(false);
+  const listInitialized                       = useRef(false);
   const [selectedPantry, setSelectedPantry]   = useState<Pantry | null>(null);
   const [selectionSource, setSelectionSource] = useState<"map" | "list" | null>(null);
   const listScrollRef = useRef<HTMLDivElement | null>(null);
 
   const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
-  const [mapCenter, setMapCenter]     = useState(DEFAULT_CENTER);
+
+  // Refs for bounds-based fetching
+  const mapRef      = useRef<google.maps.Map | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef    = useRef<AbortController | null>(null);
 
   const [showServiceGapLayer, setShowServiceGapLayer] = useState(false);
   const [zipStats, setZipStats]                       = useState<Record<string, ZipStat>>({});
@@ -483,37 +491,112 @@ export function FoodResourceMapPage() {
 
   const activeFilterCount = [!!searchQuery, typeFilter !== "all", openNowOnly, statusFilter !== "all"].filter(Boolean).length;
 
-  // Single fetch — re-runs on keyword change
-  useEffect(() => {
-    setLoading(true); setSelectedPantry(null);
-    const params = new URLSearchParams();
-    if (searchQuery) params.set("search", searchQuery);
-    fetch(`/api/map-data?${params}`)
-      .then(r => r.json())
-      .then(d => setAllPantries(d.pantries ?? d.resources ?? []))
-      .catch(() => setAllPantries([]))
-      .finally(() => setLoading(false));
-  }, [searchQuery]);
+  // ── Bounds-based fetching ─────────────────────────────────────────────────
 
-  // Zip stats on mount
+  const fetchForBounds = useCallback(async (searchQ: string) => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const zoom = map.getZoom() ?? 0;
+    // Only fetch at zoom 8+; below that the bounding box is too large for the API
+    if (zoom < MIN_FETCH_ZOOM) {
+      setAllPantries([]);
+      return;
+    }
+
+    const bounds = map.getBounds();
+    if (!bounds) return;
+
+    const ne = bounds.getNorthEast();
+    const sw = bounds.getSouthWest();
+
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        north: String(ne.lat()),
+        south: String(sw.lat()),
+        east:  String(ne.lng()),
+        west:  String(sw.lng()),
+      });
+      if (searchQ) params.set("search", searchQ);
+
+      const res = await fetch(`/api/map-data?${params}`, {
+        signal: controller.signal,
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
+      const d = await res.json();
+      const incoming = d.pantries ?? [];
+      const incomingList = d.listResources ?? incoming.filter((p: Pantry) => p.name);
+      setAllPantries(incoming);
+      if (!listInitialized.current && incomingList.length > 0) {
+        listInitialized.current = true;
+        setListPantries(incomingList);
+      }
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        console.error("Map fetch error:", err);
+        setAllPantries([]);
+      }
+    } finally {
+      if (abortRef.current === controller) abortRef.current = null;
+      setLoading(false);
+    }
+  }, []);
+
+  // Fires after every pan/zoom
+  const onIdle = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => void fetchForBounds(searchQuery), 250);
+  }, [fetchForBounds, searchQuery]);
+
+  // Re-fetch when search query changes
   useEffect(() => {
-    fetch("/api/zip-stats")
+    if (!mapRef.current) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => void fetchForBounds(searchQuery), 250);
+  }, [searchQuery, fetchForBounds]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (abortRef.current) abortRef.current.abort();
+    };
+  }, []);
+
+  // Fetch default NYC pantries on mount — shown when zoomed out
+  useEffect(() => {
+    fetch("/api/map-data?north=40.92&south=40.49&east=-73.70&west=-74.26", { cache: "no-store" })
       .then(r => r.json())
-      .then(d => { console.log("[ZipStats] sample keys:", Object.keys(d.zipStats ?? {}).slice(0, 5)); setZipStats(d.zipStats ?? {}); })
+      .then(d => setDefaultPantries(d.pantries ?? []))
       .catch(() => {});
   }, []);
 
-  // Lazy-load GeoJSON from /public on first toggle
+  // Zip stats on mount
+
+  useEffect(() => {
+    fetch("/api/zip-stats")
+      .then(r => r.json())
+      .then(d => setZipStats(d.zipStats ?? {}))
+      .catch(() => {});
+  }, []);
+
+  // Lazy-load GeoJSON on first toggle
   useEffect(() => {
     if (!showServiceGapLayer || geoJsonLoaded) return;
     setGeoJsonLoaded(true);
     fetch("/nyc-zips.geojson")
       .then(r => { if (!r.ok) throw new Error(`/nyc-zips.geojson ${r.status}`); return r.json(); })
-      .then(d => { console.log("[ZipStats] GeoJSON sample props:", d.features?.[0]?.properties); setGeoJson(d); })
+      .then(d => setGeoJson(d))
       .catch(err => console.error("[ZipStats] GeoJSON error:", err));
   }, [showServiceGapLayer, geoJsonLoaded]);
 
-  // Apply / remove layer
+  // Apply / remove overlay layer
   useEffect(() => {
     if (!mapInstance) return;
     mapInstance.data.forEach(f => mapInstance.data.remove(f));
@@ -541,8 +624,16 @@ export function FoodResourceMapPage() {
     });
   }, [showServiceGapLayer, geoJson, mapInstance, zipStats]);
 
-  // Derived
-  const filteredResources = allPantries
+  // ── Derived state ─────────────────────────────────────────────────────────
+
+  // List never clears — shows initial load, updated only when marker clicked
+  const displayPantries = listPantries.length > 0
+    ? listPantries
+    : lastClicked
+      ? [lastClicked, ...defaultPantries.filter(p => p.id !== lastClicked.id)]
+      : defaultPantries;
+
+  const filteredResources = displayPantries
     .filter(p => {
       if (searchCenter && distanceMiles(searchCenter.lat, searchCenter.lng, p.latitude, p.longitude) > radiusMiles) return false;
       if (openNowOnly && !p.isOpenNow) return false;
@@ -560,17 +651,26 @@ export function FoodResourceMapPage() {
       return 0;
     });
 
-  const searchedZipStat = zipInput.length === 5 ? zipStats[String(zipInput)] : undefined;
+  // Map pins — dynamic per-viewport, not limited to the sidebar 100
+  const mapMarkers = allPantries.filter(p => {
+    if (searchCenter && distanceMiles(searchCenter.lat, searchCenter.lng, p.latitude, p.longitude) > radiusMiles) return false;
+    if (typeFilter !== "all" && p.resourceTypeId !== typeFilter) return false;
+    if (statusFilter === "published"   && p.isPublished === false) return false;
+    if (statusFilter === "unpublished" && p.isPublished !== false) return false;
+    return true;
+  }).slice(0, MAX_MARKERS);
+
+  const searchedZipStat = zipInput.length === 5 ? zipStats[zipInput] : undefined;
 
   const zoomTo = (lat: number, lng: number, miles: number) => {
-    setSearchCenter({ lat, lng }); setMapCenter({ lat, lng }); setSelectedPantry(null);
+    setSearchCenter({ lat, lng }); setSelectedPantry(null);
     if (mapInstance) { mapInstance.panTo({ lat, lng }); mapInstance.setZoom(miles <= 1 ? 15 : miles <= 2 ? 14 : miles <= 5 ? 13 : 12); }
   };
 
   const handleZipSearch = async () => {
     const zip = zipInput.trim();
     if (!/^\d{5}$/.test(zip)) { setZipError("Enter a valid 5-digit ZIP."); return; }
-    const known = zipStats[String(zip)];
+    const known = zipStats[zip];
     if (!known) { setZipError("No pantry data found for that ZIP code."); return; }
     setZipError(null); setZipLoading(true);
     try {
@@ -594,8 +694,8 @@ export function FoodResourceMapPage() {
 
   const handleClearSearch = () => {
     setZipInput(""); setZipError(null); setSearchCenter(null);
-    setMapCenter(DEFAULT_CENTER); setSelectedPantry(null); setSelectionSource(null);
-    if (mapInstance) { mapInstance.panTo(DEFAULT_CENTER); mapInstance.setZoom(11); }
+    setSelectedPantry(null); setSelectionSource(null);
+    if (mapInstance) { mapInstance.panTo(DEFAULT_CENTER); mapInstance.setZoom(DEFAULT_ZOOM); }
   };
 
   const clearAllFilters = () => {
@@ -608,7 +708,6 @@ export function FoodResourceMapPage() {
     setSortBy("default"); setZipInfoWindow(null); handleClearSearch();
   };
 
-  // Click card in list → expand inline, no map pan
   const handleCardSelect = (p: Pantry) => {
     if (selectedPantry?.id === p.id && selectionSource === "list") {
       setSelectedPantry(null); setSelectionSource(null);
@@ -618,30 +717,66 @@ export function FoodResourceMapPage() {
     }
   };
 
-  // Click dot on map → pin detail panel at top of list + scroll list to top
-  const handleMarkerClick = (p: Pantry) => {
+  const handleMarkerClick = async (p: Pantry) => {
     if (selectedPantry?.id === p.id && selectionSource === "map") {
-      setSelectedPantry(null); setSelectionSource(null);
-    } else {
-      setSelectedPantry(p); setSelectionSource("map");
-      if (mapInstance) { mapInstance.panTo({ lat: p.latitude, lng: p.longitude }); mapInstance.setZoom(15); }
-      // Scroll list to top so the pinned panel is immediately visible
-      requestAnimationFrame(() => {
-        listScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+      setSelectedPantry(null); setSelectionSource(null); return;
+    }
+    setSelectedPantry(p); setSelectionSource("map");
+    setLastClicked(p);
+    if (mapInstance) { mapInstance.panTo({ lat: p.latitude, lng: p.longitude }); mapInstance.setZoom(15); }
+    requestAnimationFrame(() => {
+      listScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    try {
+      const res = await fetch(`/api/map-data?id=${encodeURIComponent(p.id)}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      const detail = data.pantry;
+      if (!detail) return;
+      setSelectedPantry({
+        ...p,
+        name:          detail.name,
+        location:      detail.location,
+        hours:         detail.hours,
+        description:   detail.description,
+        phone:         detail.phone,
+        website:       detail.website,
+        ratingAverage: detail.ratingAverage,
+        reviewCount:   detail.reviewCount,
+        badge:         detail.badge,
+        badgeColor:    detail.badgeColor,
       });
+      // Bubble clicked pantry to top of list with full details
+      setListPantries(prev => {
+        const enriched = {
+          ...p,
+          name:          detail.name,
+          location:      detail.location,
+          hours:         detail.hours,
+          description:   detail.description,
+          phone:         detail.phone,
+          website:       detail.website,
+          ratingAverage: detail.ratingAverage,
+          reviewCount:   detail.reviewCount,
+          badge:         detail.badge,
+          badgeColor:    detail.badgeColor,
+        };
+        return [enriched, ...prev.filter(x => x.id !== p.id)];
+      });
+    } catch (err) {
+      console.error("Detail fetch error:", err);
     }
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
 
-      {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-gray-900">Food Resource Map</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {loading ? "Loading…" : `${allPantries.length.toLocaleString()} resources across NYC`}
+            {loading ? "Loading…" : `${allPantries.length.toLocaleString()} resources in current view`}
           </p>
         </div>
         <Button variant="ghost" size="sm" onClick={() => exportToCSV(filteredResources, "food-resources.csv")} className="gap-1.5 text-gray-600">
@@ -652,7 +787,6 @@ export function FoodResourceMapPage() {
       {/* Filter Bar */}
       <div className="bg-white/95 backdrop-blur border border-gray-200 rounded-xl shadow-sm p-3 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-
           <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
             <Navigation className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
             <input type="text" inputMode="numeric" maxLength={5} placeholder="ZIP code" value={zipInput}
@@ -777,7 +911,7 @@ export function FoodResourceMapPage() {
       {/* Master-Detail Split View */}
       <div className="flex rounded-xl border border-gray-200 overflow-hidden shadow-md" style={{ height: "750px" }}>
 
-        {/* LEFT — Card list (28%) */}
+        {/* LEFT — Card list */}
         <div className="flex flex-col border-r border-gray-200 bg-gray-50" style={{ width: "28%" }}>
           <div className="px-4 py-3 bg-white border-b border-gray-200 shrink-0">
             <div className="flex items-center justify-between gap-2">
@@ -796,7 +930,6 @@ export function FoodResourceMapPage() {
               </div>
             </div>
 
-            {/* ZIP service gap stat banner */}
             {searchCenter && searchedZipStat && (
               <div className={`mt-2 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 ${
                 searchedZipStat.pctUnavailable >= 80 ? "bg-red-50 text-red-700"
@@ -806,13 +939,14 @@ export function FoodResourceMapPage() {
               }`}>
                 <span className="font-bold">{searchedZipStat.pctUnavailable}%</span>
                 unavailable in ZIP {zipInput}
-                <span className="ml-auto font-normal opacity-70">{searchedZipStat.unavailable}/{searchedZipStat.total}</span>
+                <span className="ml-auto font-normal opacity-70">
+                  {searchedZipStat.unavailable ?? "??"}/{searchedZipStat.total ?? "??"}
+                </span>
               </div>
             )}
           </div>
 
           <div ref={listScrollRef} className="flex-1 overflow-y-auto pb-3 space-y-2">
-            {/* Map-click selection — pinned at the top */}
             {selectedPantry && selectionSource === "map" && (
               <div className="px-3 pt-3">
                 <PantryDetailCard pantry={selectedPantry} onClose={() => { setSelectedPantry(null); setSelectionSource(null); }} />
@@ -828,9 +962,18 @@ export function FoodResourceMapPage() {
 
             {loading && <div className="flex items-center justify-center h-40 text-sm text-gray-400">Loading…</div>}
 
+            {!loading && filteredResources.length === 0 && (
+              <div className="flex flex-col items-center justify-center h-40 text-center px-4">
+                <AlertCircle className="w-8 h-8 text-gray-300 mb-2" />
+                <p className="text-sm text-gray-500">No resources match your filters.</p>
+                {activeFilterCount > 0 && (
+                  <button onClick={clearAllFilters} className="mt-2 text-xs text-primary hover:underline">Clear filters</button>
+                )}
+              </div>
+            )}
+
             {!loading && filteredResources.map(p => (
               <div key={p.id} className="px-3">
-                {/* List-click selection — expands inline */}
                 {selectedPantry?.id === p.id && selectionSource === "list" ? (
                   <PantryDetailCard pantry={p} onClose={() => { setSelectedPantry(null); setSelectionSource(null); }} />
                 ) : (
@@ -843,26 +986,25 @@ export function FoodResourceMapPage() {
                 )}
               </div>
             ))}
-
-            {!loading && filteredResources.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-40 text-center px-4">
-                <AlertCircle className="w-8 h-8 text-gray-300 mb-2" />
-                <p className="text-sm text-gray-500">No resources match your filters.</p>
-                {activeFilterCount > 0 && (
-                  <button onClick={clearAllFilters} className="mt-2 text-xs text-primary hover:underline">Clear filters</button>
-                )}
-              </div>
-            )}
           </div>
         </div>
 
-        {/* RIGHT — Google Map (72%) */}
+        {/* RIGHT — Google Map */}
         <div className="flex-1 relative">
           <GoogleMap
             mapContainerStyle={{ width: "100%", height: "100%" }}
-            center={mapCenter} zoom={11}
-            options={{ scrollwheel: true, gestureHandling: "greedy", zoomControl: true, fullscreenControl: true }}
-            onLoad={map => setMapInstance(map)}
+            center={DEFAULT_CENTER}
+            zoom={DEFAULT_ZOOM}
+            options={{
+              scrollwheel: true,
+              gestureHandling: "greedy",
+              zoomControl: true,
+              fullscreenControl: true,
+              // Prevent zooming out past city level — API returns nothing at national zoom
+              minZoom: MIN_MAP_ZOOM,
+            }}
+            onLoad={map => { setMapInstance(map); mapRef.current = map; }}
+            onIdle={onIdle}
           >
             {searchCenter && (
               <Circle center={searchCenter} radius={radiusMiles * MILES_TO_METERS}
@@ -874,7 +1016,7 @@ export function FoodResourceMapPage() {
                 title="Search location" />
             )}
 
-            {filteredResources.map(p => (
+            {mapMarkers.map(p => (
               <Marker key={p.id} position={{ lat: p.latitude, lng: p.longitude }}
                 icon={getMarkerIcon(p.badge, selectedPantry?.id === p.id)}
                 onClick={() => handleMarkerClick(p)}>
@@ -887,11 +1029,6 @@ export function FoodResourceMapPage() {
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${p.isOpenNow ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                           {p.isOpenNow ? "● Open Now" : "Closed"}
                         </span>
-                      )}
-                      {p.waitTimeMinutesAverage != null && (
-                        <p className={`text-xs mt-1 font-medium ${waitColor(p.waitTimeMinutesAverage)}`}>
-                          ⏱ {waitLabel(p.waitTimeMinutesAverage)} avg wait
-                        </p>
                       )}
                       {p.ratingAverage != null && (
                         <p className={`text-xs mt-0.5 font-medium ${ratingColor(p.ratingAverage)}`}>
@@ -919,9 +1056,14 @@ export function FoodResourceMapPage() {
             )}
           </GoogleMap>
 
+          {/* Zoom hint shown when at min zoom */}
+          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur rounded-lg shadow px-3 py-1.5 text-xs text-gray-500 pointer-events-none">
+            Pan to any city in the US to load resources
+          </div>
+
           {searchCenter && (
             <div className="absolute top-3 left-3 bg-white/95 backdrop-blur rounded-lg shadow-md px-3 py-1.5 text-xs font-semibold text-gray-700 pointer-events-none">
-              {filteredResources.length} locations within {radiusMiles} mi
+              {mapMarkers.length} locations within {radiusMiles} mi
             </div>
           )}
 

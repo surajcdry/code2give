@@ -1,114 +1,209 @@
-import pool from "@/lib/db/pool";
+// src/lib/services/map.ts
 
-const DAY_CODES = new Set(["MO","TU","WE","TH","FR","SA","SU"]);
+const API_BASE = "https://platform.foodhelpline.org";
 
-function computeReliability(ratingAverage: number | null, shifts: unknown): {
-  reliabilityScore: number;
-  badge: "Excellent" | "Good" | "At Risk";
-  badgeColor: "green" | "yellow" | "red";
-} {
-  // feedbackScore: normalize rating to 0-100, null = 50
-  const feedbackScore = ratingAverage != null
-    ? Math.min((ratingAverage / 3.5) * 100, 100)
-    : 50;
+// ---- Types ----------------------------------------------------------------
 
-  // consistencyScore: count unique days from BYDAY in shifts RRULE
-  let uniqueDays = 0;
-  if (Array.isArray(shifts) && shifts.length > 0) {
-    const days = new Set<string>();
-    for (const shift of shifts) {
-      const pattern = (shift as Record<string, unknown>)?.recurrencePattern;
-      if (typeof pattern === "string") {
-        const m = pattern.match(/BYDAY=([^;\n]+)/);
-        if (m) {
-          m[1].split(",").forEach(code => {
-            const trimmed = code.trim().replace(/[^A-Z]/g, "");
-            if (DAY_CODES.has(trimmed)) days.add(trimmed);
-          });
-        }
-      }
-    }
-    uniqueDays = days.size;
-  }
-  const consistencyScore = (uniqueDays / 7) * 100;
-
-  const reliabilityScore = Math.round((feedbackScore * 0.6 + consistencyScore * 0.4) * 10) / 10;
-
-  let badge: "Excellent" | "Good" | "At Risk";
-  let badgeColor: "green" | "yellow" | "red";
-  if (reliabilityScore >= 75) { badge = "Excellent"; badgeColor = "green"; }
-  else if (reliabilityScore >= 50) { badge = "Good"; badgeColor = "yellow"; }
-  else { badge = "At Risk"; badgeColor = "red"; }
-
-  return { reliabilityScore, badge, badgeColor };
-}
-
-const ORDER_BY: Record<string, string> = {
-  top_rated:       '"ratingAverage" DESC NULLS LAST, "subscriberCount" DESC',
-  needs_attention: '"ratingAverage" ASC NULLS LAST, "waitTimeMinutesAverage" DESC NULLS LAST',
-  most_subscribed: '"subscriberCount" DESC NULLS LAST',
-  most_reviewed:   '"reviewCount" DESC NULLS LAST',
-  default:         'priority DESC NULLS LAST, "subscriberCount" DESC',
+type MapBounds = {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
 };
 
-export async function getMapData(filter = "default") {
-  const orderBy = ORDER_BY[filter] ?? ORDER_BY.default;
+type MarkerFeature = {
+  type: "Feature";
+  geometry: { type: "Point"; coordinates: [number, number] };
+  properties: { id: string; resourceTypeId: string };
+};
 
-  // Query real Lemontree resource data — food pantries and soup kitchens with valid coordinates
-  const pantryResult = await pool.query(`
-    SELECT
-      id,
-      name,
-      COALESCE(
-        NULLIF(
-          TRIM(CONCAT_WS(', ',
-            NULLIF(TRIM("addressStreet1"), ''),
-            NULLIF(TRIM(city), ''),
-            NULLIF(TRIM(state), '')
-          )), ''
-        ),
-        'New York, NY'
-      ) AS location,
-      latitude,
-      longitude,
-      "resourceTypeName" AS hours,
-      COALESCE(NULLIF(TRIM(description), ''), 'Food resource available in this area.') AS description,
-      "resourceTypeId",
-      "ratingAverage",
-      "waitTimeMinutesAverage",
-      "reviewCount",
-      "acceptingNewClients",
-      "resourceStatusId",
-      shifts
-    FROM "Resource"
-    WHERE latitude IS NOT NULL
-      AND longitude IS NOT NULL
-      AND "resourceStatusId" = 'PUBLISHED'
-      AND "resourceTypeId" IN ('FOOD_PANTRY', 'SOUP_KITCHEN', 'COMMUNITY_FRIDGE')
-      AND state IN ('NY', 'New York', 'Ny')
-    ORDER BY ${orderBy}
-    LIMIT 500
-  `);
+type MarkerCollection = {
+  type: "FeatureCollection";
+  features: MarkerFeature[];
+};
 
-  const [censusResult, countResult] = await Promise.all([
-    pool.query('SELECT * FROM "CensusData"'),
-    pool.query(`
-      SELECT COUNT(*) FROM "Resource"
-      WHERE state IN ('NY', 'New York', 'Ny')
-        AND "resourceStatusId" = 'PUBLISHED'
-        AND "resourceTypeId" IN ('FOOD_PANTRY', 'SOUP_KITCHEN', 'COMMUNITY_FRIDGE')
-    `),
+type LemontreeResource = {
+  id: string;
+  name: string | null;
+  description: string | null;
+  addressStreet1: string | null;
+  addressStreet2: string | null;
+  city: string | null;
+  state: string | null;
+  zipCode: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  website: string | null;
+  images?: { url: string }[];
+  occurrences?: { startTime: string; endTime: string; skippedAt: string | null }[];
+  contacts?: { phone?: string }[];
+  resourceType?: { id: string; name: string };
+  ratingAverage?: number | null;
+  _count?: { reviews?: number; resourceSubscriptions?: number };
+  acceptingNewClients?: boolean | null;
+  waitTimeMinutesAverage?: number | null;
+};
+
+// ---- Helpers ---------------------------------------------------------------
+
+function buildAddress(r: LemontreeResource): string {
+  const parts = [r.addressStreet1, r.addressStreet2, r.city, r.state, r.zipCode]
+    .map((p) => (p ?? "").trim())
+    .filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : "Address unavailable";
+}
+
+function getHoursLabel(r: LemontreeResource): string {
+  const next = (r.occurrences ?? []).find((o) => !o.skippedAt);
+  if (!next) return "Schedule unavailable";
+  const start = new Date(next.startTime);
+  const end = new Date(next.endTime);
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return "Schedule unavailable";
+  return `Next: ${start.toLocaleDateString("en-US", {
+    weekday: "short", month: "short", day: "numeric",
+  })} · ${start.toLocaleTimeString("en-US", {
+    hour: "numeric", minute: "2-digit",
+  })}–${end.toLocaleTimeString("en-US", {
+    hour: "numeric", minute: "2-digit",
+  })}`;
+}
+
+function computeBadge(ratingAverage: number | null | undefined): {
+  badge: "Excellent" | "Good" | "At Risk" | null;
+  badgeColor: "green" | "yellow" | "red" | null;
+} {
+  if (ratingAverage == null) return { badge: null, badgeColor: null };
+  if (ratingAverage >= 3.0)  return { badge: "Excellent", badgeColor: "green" };
+  if (ratingAverage >= 2.0)  return { badge: "Good",      badgeColor: "yellow" };
+  return                            { badge: "At Risk",   badgeColor: "red" };
+}
+
+function resourceToPantry(r: LemontreeResource) {
+  const { badge, badgeColor } = computeBadge(r.ratingAverage);
+  return {
+    id:                    r.id,
+    resourceTypeId:        r.resourceType?.id ?? "",
+    latitude:              r.latitude ?? 0,
+    longitude:             r.longitude ?? 0,
+    name:                  r.name?.trim() || "",
+    location:              buildAddress(r),
+    hours:                 getHoursLabel(r),
+    description:           r.description?.trim() || "",
+    website:               r.website ?? null,
+    phone:                 r.contacts?.[0]?.phone ?? null,
+    ratingAverage:         r.ratingAverage ?? null,
+    reviewCount:           r._count?.reviews ?? null,
+    subscriberCount:       r._count?.resourceSubscriptions ?? null,
+    waitTimeMinutesAverage: r.waitTimeMinutesAverage ?? null,
+    acceptingNewClients:   r.acceptingNewClients ?? null,
+    badge,
+    badgeColor,
+    isPublished:           true,
+  };
+}
+
+// ---- Exports ---------------------------------------------------------------
+
+export async function getMapData(_filter = "default", bounds?: MapBounds | null) {
+  if (!bounds) {
+    return { pantries: [], totalPantries: 0, censusStats: [] };
+  }
+
+  const centerLat = (bounds.north + bounds.south) / 2;
+  const centerLng = (bounds.east + bounds.west) / 2;
+
+  // Run both calls in parallel — markers for pins, resources for the list
+  const [markersRes, resourcesRes] = await Promise.all([
+    fetch(
+      `${API_BASE}/api/resources/markersWithinBounds?corner=${bounds.west},${bounds.south}&corner=${bounds.east},${bounds.north}`,
+      { cache: "no-store", headers: { Accept: "application/json" } }
+    ),
+    fetch(
+      `${API_BASE}/api/resources?lat=${centerLat}&lng=${centerLng}&take=100`,
+      { cache: "no-store", headers: { Accept: "application/json" } }
+    ),
   ]);
 
-  const pantries = pantryResult.rows.map(row => {
-    const { reliabilityScore, badge, badgeColor } = computeReliability(row.ratingAverage, row.shifts);
-    const { shifts: _s, ...rest } = row;
-    return { ...rest, reliabilityScore, badge, badgeColor };
+  if (!markersRes.ok) throw new Error(`markersWithinBounds failed: ${markersRes.status}`);
+
+  const collection = (await markersRes.json()) as MarkerCollection;
+
+  // Build a full-detail lookup map from the resources call
+  const detailMap = new Map<string, ReturnType<typeof resourceToPantry>>();
+  if (resourcesRes.ok) {
+    const raw = await resourcesRes.json();
+    // The /api/resources endpoint returns superjson: { json: { resources: [...] } }
+    const resources: LemontreeResource[] = raw?.json?.resources ?? raw?.resources ?? [];
+    console.log(`[map] resources fetched: ${resources.length}, first name: ${resources[0]?.name}`);
+    for (const r of resources) {
+      detailMap.set(r.id, resourceToPantry(r));
+    }
+  }
+
+  const features = Array.isArray(collection?.features) ? collection.features : [];
+
+  // Map pins — all markers from bounds (lightweight, up to 1000)
+  const markers = features
+    .filter(f =>
+      f?.geometry?.type === "Point" &&
+      Array.isArray(f.geometry.coordinates) &&
+      f.geometry.coordinates.length === 2 &&
+      typeof f.properties?.id === "string"
+    )
+    .map(f => {
+      const detail = detailMap.get(f.properties.id);
+      if (detail) return detail;
+      const { badge, badgeColor } = computeBadge(null);
+      return {
+        id: f.properties.id,
+        resourceTypeId: f.properties.resourceTypeId,
+        latitude: f.geometry.coordinates[1],
+        longitude: f.geometry.coordinates[0],
+        name: "", location: "", hours: "", description: "",
+        website: null, phone: null, ratingAverage: null,
+        reviewCount: null, subscriberCount: null,
+        waitTimeMinutesAverage: null, acceptingNewClients: null,
+        badge, badgeColor, isPublished: true,
+      };
+    });
+
+  // List — use the full detail resources (top 100 nearest, all have names)
+  const listResources = Array.from(detailMap.values());
+
+  // Merge: for markers that have detail, use enriched data; rest are pin-only
+  const pantries = markers.map(m => {
+    const detail = detailMap.get(m.id);
+    return detail ?? m;
   });
 
+  return { pantries, listResources, totalPantries: pantries.length, censusStats: [] };
+}
+
+export async function getResourceDetails(resourceId: string) {
+  const response = await fetch(
+    `${API_BASE}/api/resources/${encodeURIComponent(resourceId)}`,
+    { cache: "no-store", headers: { Accept: "application/json" } }
+  );
+
+  if (!response.ok) throw new Error(`Resource detail fetch failed: ${response.status}`);
+
+  const raw = await response.json() as { json: LemontreeResource };
+  const r = raw.json;
+  const { badge, badgeColor } = computeBadge(r.ratingAverage);
+
   return {
-    pantries,
-    totalPantries: parseInt(countResult.rows[0].count, 10),
-    censusStats: censusResult.rows,
+    id:               r.id,
+    name:             r.name?.trim() || "Unnamed resource",
+    description:      r.description?.trim() || "Food resource available in this area.",
+    location:         buildAddress(r),
+    hours:            getHoursLabel(r),
+    resourceTypeLabel: r.resourceType?.name || "Food resource",
+    website:          r.website ?? null,
+    phone:            r.contacts?.[0]?.phone ?? null,
+    imageUrl:         r.images?.[0]?.url ?? null,
+    ratingAverage:    r.ratingAverage ?? null,
+    reviewCount:      r._count?.reviews ?? 0,
+    badge,
+    badgeColor,
   };
 }
