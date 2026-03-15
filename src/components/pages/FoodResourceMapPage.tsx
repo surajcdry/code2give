@@ -91,6 +91,13 @@ const GAP_COLORS = [
   { label: "Good <20%",       color: "#C8E6C9" },
 ];
 
+const POVERTY_COLORS = [
+  { label: "High ≥40%",        color: "#7B1FA2" },
+  { label: "Mod-high 25–39%",  color: "#BA68C8" },
+  { label: "Moderate 10–24%",  color: "#E1BEE7" },
+  { label: "Low <10%",         color: "#F3E5F5" },
+];
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function distanceMiles(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 3958.8, dLat = ((lat2 - lat1) * Math.PI) / 180, dLng = ((lng2 - lng1) * Math.PI) / 180;
@@ -125,6 +132,13 @@ function gapFillColor(pct: number): string {
   if (pct >= 50) return "#EF5350";
   if (pct >= 20) return "#FFB74D";
   return "#C8E6C9";
+}
+
+function povertyDotColor(w: number): string {
+  if (w >= 0.4)  return "#7B1FA2";
+  if (w >= 0.25) return "#AB47BC";
+  if (w >= 0.1)  return "#CE93D8";
+  return "#E8D5F0";
 }
 
 function getZipFromFeature(feature: google.maps.Data.Feature): string {
@@ -245,6 +259,7 @@ function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose: () => 
           </div>
         </div>
 
+        {/* Phone */}
         {pantry.phone && (
           <div className="flex gap-2.5">
             <Phone className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
@@ -254,8 +269,65 @@ function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose: () => 
             </div>
           </div>
         )}
+
+        {/* Website */}
+        {pantry.website && (
+          <div className="flex gap-2.5">
+            <ExternalLink className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Website</p>
+              <a href={pantry.website} target="_blank" rel="noopener noreferrer"
+                className="text-xs text-blue-600 hover:underline break-all">
+                {pantry.website.replace(/^https?:\/\//, "")}
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Description */}
+        {pantry.description && (
+          <div className="flex gap-2.5">
+            <Navigation className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">About</p>
+              <p className="text-gray-600 text-xs leading-relaxed">{pantry.description}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Cultural + language tags */}
+        {((pantry.culturalTags?.length ?? 0) > 0 || (pantry.languages?.length ?? 0) > 0) && (
+          <div>
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Tags</p>
+            <div className="flex flex-wrap gap-1">
+              {pantry.culturalTags?.map(t => (
+                <span key={t} className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-100 font-medium">{t}</span>
+              ))}
+              {pantry.languages?.map(l => (
+                <span key={l} className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 font-medium">{l}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Notes */}
+        {pantry.notes && (
+          <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            <p className="text-[11px] font-bold text-amber-700 mb-0.5">Note</p>
+            <p className="text-xs text-amber-800 leading-relaxed">{pantry.notes}</p>
+          </div>
+        )}
+
+        {/* Published status */}
+        <div className="flex items-center gap-1.5 pt-1 border-t border-gray-100">
+          <span className={`w-1.5 h-1.5 rounded-full ${pantry.isPublished !== false ? "bg-green-500" : "bg-gray-300"}`} />
+          <span className="text-[11px] text-gray-400">
+            {pantry.isPublished !== false ? "Published & active" : "Unpublished"}
+          </span>
+        </div>
       </div>
 
+      {/* Footer CTA */}
       <div className="px-4 pb-4">
         <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
           <Button variant="default" size="sm" className="w-full gap-1.5 h-8 bg-violet-500 hover:bg-violet-600 text-white font-bold">
@@ -341,8 +413,12 @@ export function FoodResourceMapPage() {
   const [zipStats, setZipStats]                       = useState<Record<string, ZipStat>>({});
   const [geoJson, setGeoJson]                          = useState<object | null>(null);
   const [geoJsonLoaded, setGeoJsonLoaded]             = useState(false);
-  const [zipInfoWindow, setZipInfoWindow]             = useState<{ lat: number; lng: number; content: string } | null>(null);
+  const [zipInfoWindow, setZipInfoWindow]             = useState<{ lat: number; lng: number; content: string; title: string } | null>(null);
   const dataListenerRef                                = useRef<google.maps.MapsEventListener | null>(null);
+
+  const [showTractLayer, setShowTractLayer]               = useState(false);
+  const [tractCentroids, setTractCentroids]               = useState<[number, number, number][]>([]);
+  const [tractCentroidsLoaded, setTractCentroidsLoaded]   = useState(false);
 
   const [zipInput, setZipInput]         = useState("");
   const [zipError, setZipError]         = useState<string | null>(null);
@@ -397,29 +473,205 @@ export function FoodResourceMapPage() {
     fetch("/nyc-zips.geojson").then(r => r.json()).then(d => setGeoJson(d)).catch(err => console.error(err));
   }, [showServiceGapLayer, geoJsonLoaded]);
 
+  // Lazy-load tract centroids on first toggle
+  useEffect(() => {
+    if (!showTractLayer || tractCentroidsLoaded) return;
+    setTractCentroidsLoaded(true);
+    fetch("/tract-centroids.json")
+      .then(r => { if (!r.ok) throw new Error(`/tract-centroids.json ${r.status}`); return r.json(); })
+      .then(d => setTractCentroids(d))
+      .catch(err => console.error("[TractLayer] centroids error:", err));
+  }, [showTractLayer, tractCentroidsLoaded]);
+
+  // Lazy-load tract centroids on first toggle
+  useEffect(() => {
+    if (!showTractLayer || tractCentroidsLoaded) return;
+    setTractCentroidsLoaded(true);
+    fetch("/tract-centroids.json")
+      .then(r => { if (!r.ok) throw new Error(`/tract-centroids.json ${r.status}`); return r.json(); })
+      .then(d => setTractCentroids(d))
+      .catch(err => console.error("[TractLayer] centroids error:", err));
+  }, [showTractLayer, tractCentroidsLoaded]);
+
   useEffect(() => {
     if (!mapInstance) return;
     mapInstance.data.forEach(f => mapInstance.data.remove(f));
     if (dataListenerRef.current) { google.maps.event.removeListener(dataListenerRef.current); dataListenerRef.current = null; }
     setZipInfoWindow(null);
-    if (!showServiceGapLayer || !geoJson) { mapInstance.data.setStyle({}); return; }
-    mapInstance.data.addGeoJson(geoJson as object);
-    mapInstance.data.setStyle(feature => {
-      const zip  = String(getZipFromFeature(feature)).trim();
-      const stat = zip ? zipStats[zip] : undefined;
-      if (!stat) return { fillOpacity: 0 };
-      return { fillColor: gapFillColor(stat.pctUnavailable), fillOpacity: 0.55, strokeColor: "#ffffff", strokeWeight: 1.5, strokeOpacity: 1, zIndex: 0 };
-    });
-    dataListenerRef.current = mapInstance.data.addListener("click", (e: google.maps.Data.MouseEvent) => {
-      if (!e.latLng) return;
-      const zip  = String(getZipFromFeature(e.feature)).trim();
-      const stat = zip ? zipStats[zip] : undefined;
-      setZipInfoWindow({
-        lat: e.latLng.lat(), lng: e.latLng.lng(),
-        content: stat ? `ZIP ${zip}: ${stat.pctUnavailable}% unavailable.` : `ZIP ${zip}: no data.`,
+
+    if (showServiceGapLayer && geoJson) {
+      mapInstance.data.addGeoJson(geoJson as object);
+      mapInstance.data.setStyle(feature => {
+        const zip  = String(getZipFromFeature(feature)).trim();
+        const stat = zip ? zipStats[String(zip)] : undefined;
+        if (!stat) return { fillOpacity: 0 };
+        return { fillColor: gapFillColor(stat.pctUnavailable), fillOpacity: 0.55, strokeColor: "#ffffff", strokeWeight: 1.5, strokeOpacity: 1, zIndex: 0 };
       });
-    });
+      dataListenerRef.current = mapInstance.data.addListener("click", (e: google.maps.Data.MouseEvent) => {
+        if (!e.latLng) return;
+        const zip  = String(getZipFromFeature(e.feature)).trim();
+        const stat = zip ? zipStats[String(zip)] : undefined;
+        setZipInfoWindow({
+          lat: e.latLng.lat(), lng: e.latLng.lng(), title: "Service Gap",
+          content: stat ? `ZIP ${zip}: ${stat.pctUnavailable}% of resources are currently unavailable.` : `ZIP ${zip}: no service data available.`,
+        });
+      });
+    } else {
+      mapInstance.data.setStyle({});
+    }
   }, [showServiceGapLayer, geoJson, mapInstance, zipStats]);
+
+  // Canvas overlay for poverty index
+  useEffect(() => {
+    if (!mapInstance || !showTractLayer || tractCentroids.length === 0) return;
+
+    class PovertyOverlay extends google.maps.OverlayView {
+      private canvas = document.createElement("canvas");
+
+      onAdd() {
+        this.canvas.style.position = "absolute";
+        this.canvas.style.pointerEvents = "none";
+        this.getPanes()!.overlayLayer.appendChild(this.canvas);
+      }
+
+      draw() {
+        const proj = this.getProjection();
+        if (!proj) return;
+        const map = this.getMap() as google.maps.Map;
+        const w = map.getDiv().offsetWidth;
+        const h = map.getDiv().offsetHeight;
+        const center = map.getCenter()!;
+        const centerPx = proj.fromLatLngToDivPixel(center)!;
+
+        const zoom = map.getZoom() ?? 10;
+        const r    = Math.max(2, Math.min(12, zoom - 7));
+        const blur = Math.round(r * 1.5);
+        const pad  = blur * 3;          // extra margin so blur doesn't clip at edges
+
+        const totalW = w + pad * 2;
+        const totalH = h + pad * 2;
+
+        this.canvas.width  = totalW;
+        this.canvas.height = totalH;
+        this.canvas.style.left = `${centerPx.x - w / 2 - pad}px`;
+        this.canvas.style.top  = `${centerPx.y - h / 2 - pad}px`;
+
+        const originX = centerPx.x - w / 2 - pad;  // canvas top-left in div coords
+        const originY = centerPx.y - h / 2 - pad;
+
+        const ctx = this.canvas.getContext("2d")!;
+        ctx.clearRect(0, 0, totalW, totalH);
+        ctx.filter = `blur(${blur}px)`;
+
+        // Batch by color to minimise ctx state changes
+        const buckets: Record<string, [number, number][]> = {};
+        for (const [lat, lng, weight] of tractCentroids) {
+          const pt = proj.fromLatLngToDivPixel(new google.maps.LatLng(lat, lng));
+          if (!pt) continue;
+          const cx = pt.x - originX;
+          const cy = pt.y - originY;
+          if (cx < -r || cx > totalW + r || cy < -r || cy > totalH + r) continue;
+          const color = povertyDotColor(weight);
+          (buckets[color] ??= []).push([cx, cy]);
+        }
+
+        // Raise opacity as zoom increases — blur spreads colour out so zoomed-in
+        // regions look washed out without compensation.
+        ctx.globalAlpha = Math.min(0.95, 0.5 + (zoom - 7) * 0.06);
+        for (const [color, pts] of Object.entries(buckets)) {
+          ctx.beginPath();
+          for (const [cx, cy] of pts) {
+            ctx.moveTo(cx + r, cy);
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          }
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
+      }
+
+      onRemove() { this.canvas.remove(); }
+    }
+
+    const overlay = new PovertyOverlay();
+    overlay.setMap(mapInstance);
+    return () => { overlay.setMap(null); };
+  }, [mapInstance, showTractLayer, tractCentroids]);
+
+  // Canvas overlay for poverty index (replaces deprecated HeatmapLayer)
+  useEffect(() => {
+    if (!mapInstance || !showTractLayer || tractCentroids.length === 0) return;
+
+    class PovertyOverlay extends google.maps.OverlayView {
+      private canvas = document.createElement("canvas");
+
+      onAdd() {
+        this.canvas.style.position = "absolute";
+        this.canvas.style.pointerEvents = "none";
+        this.getPanes()!.overlayLayer.appendChild(this.canvas);
+      }
+
+      draw() {
+        const proj = this.getProjection();
+        if (!proj) return;
+        const map = this.getMap() as google.maps.Map;
+        const w = map.getDiv().offsetWidth;
+        const h = map.getDiv().offsetHeight;
+        const center = map.getCenter()!;
+        const centerPx = proj.fromLatLngToDivPixel(center)!;
+
+        const zoom = map.getZoom() ?? 10;
+        const r    = Math.max(2, Math.min(12, zoom - 7));
+        const blur = Math.round(r * 1.5);
+        const pad  = blur * 3;          // extra margin so blur doesn't clip at edges
+
+        const totalW = w + pad * 2;
+        const totalH = h + pad * 2;
+
+        this.canvas.width  = totalW;
+        this.canvas.height = totalH;
+        this.canvas.style.left = `${centerPx.x - w / 2 - pad}px`;
+        this.canvas.style.top  = `${centerPx.y - h / 2 - pad}px`;
+
+        const originX = centerPx.x - w / 2 - pad;  // canvas top-left in div coords
+        const originY = centerPx.y - h / 2 - pad;
+
+        const ctx = this.canvas.getContext("2d")!;
+        ctx.clearRect(0, 0, totalW, totalH);
+        ctx.filter = `blur(${blur}px)`;
+
+        // Batch by color to minimise ctx state changes
+        const buckets: Record<string, [number, number][]> = {};
+        for (const [lat, lng, weight] of tractCentroids) {
+          const pt = proj.fromLatLngToDivPixel(new google.maps.LatLng(lat, lng));
+          if (!pt) continue;
+          const cx = pt.x - originX;
+          const cy = pt.y - originY;
+          if (cx < -r || cx > totalW + r || cy < -r || cy > totalH + r) continue;
+          const color = povertyDotColor(weight);
+          (buckets[color] ??= []).push([cx, cy]);
+        }
+
+        // Raise opacity as zoom increases — blur spreads colour out so zoomed-in
+        // regions look washed out without compensation.
+        ctx.globalAlpha = Math.min(0.95, 0.5 + (zoom - 7) * 0.06);
+        for (const [color, pts] of Object.entries(buckets)) {
+          ctx.beginPath();
+          for (const [cx, cy] of pts) {
+            ctx.moveTo(cx + r, cy);
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          }
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
+      }
+
+      onRemove() { this.canvas.remove(); }
+    }
+
+    const overlay = new PovertyOverlay();
+    overlay.setMap(mapInstance);
+    return () => { overlay.setMap(null); };
+  }, [mapInstance, showTractLayer, tractCentroids]);
 
   const allChecked = legendFilter.has("Excellent") && legendFilter.has("Good") && legendFilter.has("At Risk");
 
@@ -554,12 +806,20 @@ export function FoodResourceMapPage() {
             <LocateFixed className="w-3.5 h-3.5" /> Near Me
           </Button>
 
-          <button onClick={() => setShowServiceGapLayer(v => !v)}
+          <button onClick={() => { setShowServiceGapLayer(v => !v); setShowTractLayer(false); }}
             className={`flex items-center gap-2 h-8 px-3 rounded-lg border text-xs font-semibold transition-colors ${
               showServiceGapLayer ? "bg-[#FFD700] border-yellow-400 text-slate-900" : "bg-white border-gray-200 text-gray-600 hover:border-yellow-300"
             }`}>
             <span className={`w-3 h-3 rounded-sm inline-block border ${showServiceGapLayer ? "bg-red-500 border-red-600" : "bg-gray-200 border-gray-300"}`} />
             Service Gap Layer
+          </button>
+
+          <button onClick={() => { setShowTractLayer(v => !v); setShowServiceGapLayer(false); }}
+            className={`flex items-center gap-2 h-8 px-3 rounded-lg border text-xs font-semibold transition-colors ${
+              showTractLayer ? "bg-purple-100 border-purple-400 text-purple-900" : "bg-white border-gray-200 text-gray-600 hover:border-purple-300"
+            }`}>
+            <span className={`w-3 h-3 rounded-sm inline-block border ${showTractLayer ? "bg-purple-600 border-purple-700" : "bg-gray-200 border-gray-300"}`} />
+            Equity Gap Index
           </button>
 
           <button onClick={resetAll}
@@ -602,7 +862,7 @@ export function FoodResourceMapPage() {
               <span className="text-sm font-semibold text-gray-700">
                 {loading ? "Loading…" : `${filteredResources.length} results`}
               </span>
-              <div className="flex items-center gap-1.5 bg-gray-100 rounded-lg px-2.5 py-1.5 flex-1 max-w-[160px]">
+              <div className="flex items-center gap-1.5 bg-gray-100 rounded-lg px-2.5 py-1.5 flex-1 max-w-40">
                 <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                 <input type="text" placeholder="Search…" value={searchInput}
                   onChange={e => setSearchInput(e.target.value)}
@@ -659,15 +919,23 @@ export function FoodResourceMapPage() {
             ))}
             {zipInfoWindow && (
               <InfoWindow position={{ lat: zipInfoWindow.lat, lng: zipInfoWindow.lng }} onCloseClick={() => setZipInfoWindow(null)}>
-                <div className="text-xs text-gray-800 max-w-[200px] leading-relaxed">
-                  <p className="font-semibold text-gray-900 mb-1">Service Gap</p>
+                <div className="text-xs text-gray-800 max-w-50 leading-relaxed">
+                  <p className="font-semibold text-gray-900 mb-1">{zipInfoWindow.title}</p>
                   {zipInfoWindow.content}
                 </div>
               </InfoWindow>
             )}
+
           </GoogleMap>
 
-          <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm rounded-xl shadow-md border border-gray-200 p-3 min-w-[160px]">
+          {searchCenter && (
+            <div className="absolute top-3 left-3 bg-white/95 backdrop-blur rounded-lg shadow-md px-3 py-1.5 text-xs font-semibold text-gray-700 pointer-events-none">
+              {filteredResources.length} locations within {radiusMiles} mi
+            </div>
+          )}
+
+          {/* Floating Legend */}
+          <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm rounded-xl shadow-md border border-gray-200 p-3 min-w-38">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Marker Quality</p>
             {LEGEND_MARKERS.map(({ label, color, badge }) => {
               const key = badge ?? "no-data";
@@ -706,6 +974,26 @@ export function FoodResourceMapPage() {
                 <div className="flex justify-between text-[9px] text-slate-400 font-medium">
                   <span>Good</span><span>Critical</span>
                 </div>
+              </>
+            )}
+
+
+            {showTractLayer && (
+              <>
+                <div className="my-2.5 border-t border-gray-200" />
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Equity Gap Index</p> 
+                <div className="h-2.5 w-full rounded-full mb-1"
+                  style={{ background: "linear-gradient(to right, #F3E5F5, #E1BEE7, #BA68C8, #7B1FA2)" }} />
+                <div className="flex justify-between text-[9px] text-slate-400 font-medium mb-2">
+                  <span>Low</span><span>High</span>
+                </div>
+                {POVERTY_COLORS.map(({ label, color }) => (
+                  <div key={label} className="flex items-center gap-2 mb-1">
+                    <span className="w-3.5 h-2.5 rounded shrink-0 border border-gray-200" style={{ backgroundColor: color }} />
+                    <span className="text-[10px] text-slate-500">{label}</span>
+                  </div>
+                ))}
+                <p className="text-[9px] text-slate-400 mt-1.5 leading-relaxed">% population with economic insecurity</p>
               </>
             )}
           </div>
