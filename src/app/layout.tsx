@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import GoogleMapsProvider from "@/components/providers/GoogleMapsProvider";
-import { ChatBot } from "@/components/TempBot";
 
 export const metadata: Metadata = {
   title: "Lemon-Aid",
@@ -19,8 +18,6 @@ export default function RootLayout({
         <GoogleMapsProvider>
           {children}
         </GoogleMapsProvider>
-        {/* Floating ChatBot */}
-        <ChatBot />
       </body>
     </html>
   );
