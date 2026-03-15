@@ -4,6 +4,7 @@
 import {
   MapPin, Clock, Search, X, ExternalLink, Phone,
   Navigation, Download, Timer, Filter, LocateFixed, AlertCircle, Star,
+  Layers,
 } from "lucide-react";
 import { GoogleMap, Marker, Circle, InfoWindow } from "@react-google-maps/api";
 import { Button } from "@/components/ui/Button";
@@ -91,7 +92,21 @@ const GAP_COLORS = [
   { label: "Good <20%",        color: "#C8E6C9", min: 0  },
 ];
 
+const POVERTY_COLORS = [
+  { label: "High ≥40%",        color: "#7B1FA2" },
+  { label: "Mod-high 25–39%",  color: "#BA68C8" },
+  { label: "Moderate 10–24%",  color: "#E1BEE7" },
+  { label: "Low <10%",         color: "#F3E5F5" },
+];
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
+function povertyDotColor(w: number): string {
+  if (w >= 0.4)  return "#7B1FA2";
+  if (w >= 0.25) return "#AB47BC";
+  if (w >= 0.1)  return "#CE93D8";
+  return "#E8D5F0";
+}
+
 function distanceMiles(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 3958.8, dLat = ((lat2 - lat1) * Math.PI) / 180, dLng = ((lng2 - lng1) * Math.PI) / 180;
   const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
@@ -104,8 +119,11 @@ function resolveHours(hours?: string) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getMarkerIcon(badge?: string, selected = false): any {
-  const color = MARKER_COLORS[badge ?? ""] ?? "#42A5F5";
+function getMarkerIcon(badge?: string, rating?: number | null, selected = false): any {
+  const effectiveBadge = rating != null
+    ? rating >= 2.5 ? "Excellent" : rating >= 1.5 ? "Good" : "At Risk"
+    : badge;
+  const color = MARKER_COLORS[effectiveBadge ?? ""] ?? "#42A5F5";
   return {
     path: "M 0,0 m -8,0 a 8,8 0 1,0 16,0 a 8,8 0 1,0 -16,0",
     fillColor: color, fillOpacity: 0.9,
@@ -259,6 +277,14 @@ function PantryDetailCard({ pantry, onClose }: { pantry: Pantry; onClose: () => 
             )}
           </div>
         )}
+
+        <div className="flex gap-2.5">
+          <Layers className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Resource Type</p>
+            <p className="text-gray-800 text-xs">{typeLabel}</p>
+          </div>
+        </div>
 
         <div className="flex gap-2.5">
           <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
@@ -465,8 +491,21 @@ export function FoodResourceMapPage() {
   const [zipStats, setZipStats]                       = useState<Record<string, ZipStat>>({});
   const [geoJson, setGeoJson]                         = useState<object | null>(null);
   const [geoJsonLoaded, setGeoJsonLoaded]             = useState(false);
-  const [zipInfoWindow, setZipInfoWindow]             = useState<{ lat: number; lng: number; content: string } | null>(null);
+  const [zipInfoWindow, setZipInfoWindow]             = useState<{ lat: number; lng: number; content: string; title: string } | null>(null);
   const dataListenerRef                               = useRef<google.maps.MapsEventListener | null>(null);
+
+  const [showTractLayer, setShowTractLayer]             = useState(false);
+  const [tractCentroids, setTractCentroids]             = useState<[number, number, number][]>([]);
+  const [tractCentroidsLoaded, setTractCentroidsLoaded] = useState(false);
+
+  const [legendFilter, setLegendFilter] = useState<Set<string>>(new Set(["Excellent", "Good", "At Risk"]));
+
+  const toggleLegendFilter = (key: string) =>
+    setLegendFilter(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
 
   const [zipInput, setZipInput]         = useState("");
   const [zipError, setZipError]         = useState<string | null>(null);
@@ -619,10 +658,94 @@ export function FoodResourceMapPage() {
       const stat = zip ? zipStats[String(zip)] : undefined;
       setZipInfoWindow({
         lat: e.latLng.lat(), lng: e.latLng.lng(),
+        title: "Service Gap",
         content: stat ? `ZIP ${zip}: ${stat.pctUnavailable}% of resources are currently unavailable.` : `ZIP ${zip}: no service data available.`,
       });
     });
   }, [showServiceGapLayer, geoJson, mapInstance, zipStats]);
+
+  // Lazy-load tract centroids on first toggle
+  useEffect(() => {
+    if (!showTractLayer || tractCentroidsLoaded) return;
+    setTractCentroidsLoaded(true);
+    fetch("/tract-centroids.json")
+      .then(r => { if (!r.ok) throw new Error(`/tract-centroids.json ${r.status}`); return r.json(); })
+      .then(d => setTractCentroids(d))
+      .catch(err => console.error("[TractLayer] centroids error:", err));
+  }, [showTractLayer, tractCentroidsLoaded]);
+
+  // Canvas overlay for poverty index
+  useEffect(() => {
+    if (!mapInstance || !showTractLayer || tractCentroids.length === 0) return;
+
+    class PovertyOverlay extends google.maps.OverlayView {
+      private canvas = document.createElement("canvas");
+
+      onAdd() {
+        this.canvas.style.position = "absolute";
+        this.canvas.style.pointerEvents = "none";
+        this.getPanes()!.overlayLayer.appendChild(this.canvas);
+      }
+
+      draw() {
+        const proj = this.getProjection();
+        if (!proj) return;
+        const map = this.getMap() as google.maps.Map;
+        const w = map.getDiv().offsetWidth;
+        const h = map.getDiv().offsetHeight;
+        const center = map.getCenter()!;
+        const centerPx = proj.fromLatLngToDivPixel(center)!;
+
+        const zoom = map.getZoom() ?? 10;
+        const r    = Math.max(2, Math.min(12, zoom - 7));
+        const blur = Math.round(r * 1.5);
+        const pad  = blur * 3;
+
+        const totalW = w + pad * 2;
+        const totalH = h + pad * 2;
+
+        this.canvas.width  = totalW;
+        this.canvas.height = totalH;
+        this.canvas.style.left = `${centerPx.x - w / 2 - pad}px`;
+        this.canvas.style.top  = `${centerPx.y - h / 2 - pad}px`;
+
+        const originX = centerPx.x - w / 2 - pad;
+        const originY = centerPx.y - h / 2 - pad;
+
+        const ctx = this.canvas.getContext("2d")!;
+        ctx.clearRect(0, 0, totalW, totalH);
+        ctx.filter = `blur(${blur}px)`;
+
+        const buckets: Record<string, [number, number][]> = {};
+        for (const [lat, lng, weight] of tractCentroids) {
+          const pt = proj.fromLatLngToDivPixel(new google.maps.LatLng(lat, lng));
+          if (!pt) continue;
+          const cx = pt.x - originX;
+          const cy = pt.y - originY;
+          if (cx < -r || cx > totalW + r || cy < -r || cy > totalH + r) continue;
+          const color = povertyDotColor(weight);
+          (buckets[color] ??= []).push([cx, cy]);
+        }
+
+        ctx.globalAlpha = Math.min(0.95, 0.5 + (zoom - 7) * 0.06);
+        for (const [color, pts] of Object.entries(buckets)) {
+          ctx.beginPath();
+          for (const [cx, cy] of pts) {
+            ctx.moveTo(cx + r, cy);
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          }
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
+      }
+
+      onRemove() { this.canvas.remove(); }
+    }
+
+    const overlay = new PovertyOverlay();
+    overlay.setMap(mapInstance);
+    return () => { overlay.setMap(null); };
+  }, [mapInstance, showTractLayer, tractCentroids]);
 
   // ── Derived state ─────────────────────────────────────────────────────────
 
@@ -633,13 +756,19 @@ export function FoodResourceMapPage() {
       ? [lastClicked, ...defaultPantries.filter(p => p.id !== lastClicked.id)]
       : defaultPantries;
 
+  const allChecked = legendFilter.has("Excellent") && legendFilter.has("Good") && legendFilter.has("At Risk");
+
   const filteredResources = displayPantries
     .filter(p => {
+      const effBadge = p.ratingAverage != null
+        ? p.ratingAverage >= 2.5 ? "Excellent" : p.ratingAverage >= 1.5 ? "Good" : "At Risk"
+        : p.badge;
       if (searchCenter && distanceMiles(searchCenter.lat, searchCenter.lng, p.latitude, p.longitude) > radiusMiles) return false;
       if (openNowOnly && !p.isOpenNow) return false;
       if (typeFilter !== "all" && p.resourceTypeId !== typeFilter) return false;
       if (statusFilter === "published"   && p.isPublished === false) return false;
       if (statusFilter === "unpublished" && p.isPublished !== false) return false;
+      if (!allChecked && legendFilter.size > 0 && effBadge && !legendFilter.has(effBadge)) return false;
       return true;
     })
     .sort((a, b) => {
@@ -704,8 +833,9 @@ export function FoodResourceMapPage() {
   };
 
   const resetAll = () => {
-    clearAllFilters(); setShowServiceGapLayer(false); setShowFilters(false);
+    clearAllFilters(); setShowServiceGapLayer(false); setShowTractLayer(false); setShowFilters(false);
     setSortBy("default"); setZipInfoWindow(null); handleClearSearch();
+    setLegendFilter(new Set(["Excellent", "Good", "At Risk"]));
   };
 
   const handleCardSelect = (p: Pantry) => {
@@ -744,7 +874,6 @@ export function FoodResourceMapPage() {
         ratingAverage: detail.ratingAverage,
         reviewCount:   detail.reviewCount,
         badge:         detail.badge,
-        badgeColor:    detail.badgeColor,
       });
       // Bubble clicked pantry to top of list with full details
       setListPantries(prev => {
@@ -759,7 +888,6 @@ export function FoodResourceMapPage() {
           ratingAverage: detail.ratingAverage,
           reviewCount:   detail.reviewCount,
           badge:         detail.badge,
-          badgeColor:    detail.badgeColor,
         };
         return [enriched, ...prev.filter(x => x.id !== p.id)];
       });
@@ -813,12 +941,20 @@ export function FoodResourceMapPage() {
             <LocateFixed className="w-3.5 h-3.5" /> {gpsLoading ? "Locating…" : "Near Me"}
           </Button>
 
-          <button onClick={() => setShowServiceGapLayer(v => !v)}
+          <button onClick={() => { setShowServiceGapLayer(v => !v); setShowTractLayer(false); }}
             className={`flex items-center gap-2 h-8 px-3 rounded-lg border text-xs font-semibold transition-colors ${
               showServiceGapLayer ? "bg-[#FFD700] border-yellow-400 text-slate-900" : "bg-white border-gray-200 text-gray-600 hover:border-yellow-300"
             }`}>
             <span className={`w-3 h-3 rounded-sm inline-block border ${showServiceGapLayer ? "bg-red-500 border-red-600" : "bg-gray-200 border-gray-300"}`} />
             Service Gap Layer
+          </button>
+
+          <button onClick={() => { setShowTractLayer(v => !v); setShowServiceGapLayer(false); }}
+            className={`flex items-center gap-2 h-8 px-3 rounded-lg border text-xs font-semibold transition-colors ${
+              showTractLayer ? "bg-purple-100 border-purple-400 text-purple-900" : "bg-white border-gray-200 text-gray-600 hover:border-purple-300"
+            }`}>
+            <span className={`w-3 h-3 rounded-sm inline-block border ${showTractLayer ? "bg-purple-600 border-purple-700" : "bg-gray-200 border-gray-300"}`} />
+            Equity Gap Index
           </button>
 
           {searchCenter && (
@@ -1018,7 +1154,7 @@ export function FoodResourceMapPage() {
 
             {mapMarkers.map(p => (
               <Marker key={p.id} position={{ lat: p.latitude, lng: p.longitude }}
-                icon={getMarkerIcon(p.badge, selectedPantry?.id === p.id)}
+                icon={getMarkerIcon(p.badge, p.ratingAverage, selectedPantry?.id === p.id)}
                 onClick={() => handleMarkerClick(p)}>
                 {selectedPantry?.id === p.id && (
                   <InfoWindow onCloseClick={() => { setSelectedPantry(null); setSelectionSource(null); }}>
@@ -1049,7 +1185,7 @@ export function FoodResourceMapPage() {
             {zipInfoWindow && (
               <InfoWindow position={{ lat: zipInfoWindow.lat, lng: zipInfoWindow.lng }} onCloseClick={() => setZipInfoWindow(null)}>
                 <div className="text-xs text-gray-800 max-w-[200px] leading-relaxed">
-                  <p className="font-semibold text-gray-900 mb-1">Service Gap</p>
+                  <p className="font-semibold text-gray-900 mb-1">{zipInfoWindow.title}</p>
                   {zipInfoWindow.content}
                 </div>
               </InfoWindow>
@@ -1071,16 +1207,33 @@ export function FoodResourceMapPage() {
           <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm rounded-xl shadow-md border border-gray-200 p-3 min-w-[152px]">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Marker Quality</p>
             {[
-              { label: "Excellent", color: "#2E7D32" },
-              { label: "Good",      color: "#F9A825" },
-              { label: "At Risk",   color: "#E53935" },
-              { label: "No data",   color: "#42A5F5" },
-            ].map(({ label, color }) => (
-              <div key={label} className="flex items-center gap-2 mb-1.5">
-                <span className="w-3 h-3 rounded-full shrink-0 border border-white shadow-sm" style={{ backgroundColor: color }} />
-                <span className="text-xs text-slate-600">{label}</span>
-              </div>
-            ))}
+              { label: "Excellent", color: "#2E7D32", badge: "Excellent" },
+              { label: "Good",      color: "#F9A825", badge: "Good"      },
+              { label: "At Risk",   color: "#E53935", badge: "At Risk"   },
+              { label: "No data",   color: "#42A5F5", badge: null        },
+            ].map(({ label, color, badge }) => {
+              if (!badge) return (
+                <div key={label} className="flex items-center gap-2 mb-1.5 px-2 py-1">
+                  <span className="w-3 h-3 rounded-full shrink-0 border border-white" style={{ backgroundColor: color }} />
+                  <span className="text-xs text-slate-400">{label}</span>
+                </div>
+              );
+              const active = legendFilter.has(badge);
+              return (
+                <button key={label} onClick={() => toggleLegendFilter(badge)}
+                  className={`w-full flex items-center gap-2 mb-1.5 px-2 py-1 rounded-lg transition-colors text-left ${
+                    active ? "bg-slate-100 ring-1 ring-slate-300" : "hover:bg-gray-50 opacity-60"
+                  }`}>
+                  <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${
+                    active ? "bg-violet-500 border-violet-500" : "border-gray-300 bg-white"
+                  }`}>
+                    {active && <span className="text-white text-[9px] font-bold">✓</span>}
+                  </span>
+                  <span className="w-3 h-3 rounded-full shrink-0 border border-white shadow-sm" style={{ backgroundColor: color }} />
+                  <span className={`text-xs font-semibold ${active ? "text-slate-900" : "text-slate-400"}`}>{label}</span>
+                </button>
+              );
+            })}
 
             {showServiceGapLayer && (
               <>
@@ -1098,6 +1251,25 @@ export function FoodResourceMapPage() {
                   </div>
                 ))}
                 <p className="text-[9px] text-slate-400 mt-1.5 leading-relaxed">% resources unavailable per ZIP</p>
+              </>
+            )}
+
+            {showTractLayer && (
+              <>
+                <div className="my-2.5 border-t border-gray-200" />
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Equity Gap Index</p>
+                <div className="h-2.5 w-full rounded-full mb-1"
+                  style={{ background: "linear-gradient(to right, #F3E5F5, #E1BEE7, #BA68C8, #7B1FA2)" }} />
+                <div className="flex justify-between text-[9px] text-slate-400 font-medium mb-2">
+                  <span>Low</span><span>High</span>
+                </div>
+                {POVERTY_COLORS.map(({ label, color }) => (
+                  <div key={label} className="flex items-center gap-2 mb-1">
+                    <span className="w-3.5 h-2.5 rounded shrink-0 border border-gray-200" style={{ backgroundColor: color }} />
+                    <span className="text-[10px] text-slate-500">{label}</span>
+                  </div>
+                ))}
+                <p className="text-[9px] text-slate-400 mt-1.5 leading-relaxed">% population with economic insecurity</p>
               </>
             )}
           </div>
