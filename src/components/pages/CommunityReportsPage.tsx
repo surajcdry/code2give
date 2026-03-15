@@ -1,5 +1,6 @@
 "use client";
 
+
 import { useEffect, useState, useMemo } from "react";
 import {
   Clock, CheckCircle, AlertTriangle, Star,
@@ -14,24 +15,26 @@ import {
 import { useApp } from "@/components/layout/AppLayout";
 import type { ImageAnalysisResult } from "@/lib/types/imageAnalysis";
 
+
 // ─── Types ────────────────────────────────────────────────────────────────────
+
 
 type FeedbackItem = {
   id: string; text: string; sentiment: string;
   tags: string[]; createdAt: string;
 };
 
-type ReliabilitySummary = {
-  excellent: number; good: number; atRisk: number; avgScore: number;
-  histogram: { range: string; count: number }[];
-};
+
+ 
+
 
 interface Alert {
   type: string; severity: "high" | "medium" | "low";
   title: string; description: string; count: number; zipCode?: string;
 }
 
-type ActiveTab = "reports" | "feedback_history" | "reliability" | "alerts";
+
+type ActiveTab = "reports" | "feedback_history" | "alerts";
 
 type CommunityReport = {
   id: string;
@@ -45,6 +48,7 @@ type CommunityReport = {
   tags?: string[];
   stockLevel?: "low" | "medium" | "high";
 };
+
 
 type Resource = {
   id: string;
@@ -60,7 +64,9 @@ type Resource = {
   acceptingNewClients?: boolean | null;
 };
 
+
 // ─── Fallback images (used when a resource has no API image) ──────────────────
+
 
 const FALLBACK_IMAGES = [
   "https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=600&q=80",
@@ -73,12 +79,15 @@ const FALLBACK_IMAGES = [
   "https://images.unsplash.com/photo-1543168256-418811576931?w=600&q=80",
 ];
 
+
 const RELATIVE_TIMES = [
   "Just now", "2 hours ago", "5 hours ago", "Yesterday",
   "Yesterday", "2 days ago", "2 days ago", "3 days ago", "4 days ago", "5 days ago",
 ];
 
+
 // ─── Mock fallback reports (shown when API returns < 3 named resources) ───────
+
 
 const MOCK_REPORTS: CommunityReport[] = [
   { id:"m1", resourceName:"Bronx Community Pantry", imageUrl:FALLBACK_IMAGES[0], caption:"A lot of canned food today but not much fruit left. Shelves are pretty well-stocked overall!", createdAt:"2 hours ago", anonymous:true, avatarSeed:"alpha" },
@@ -88,7 +97,9 @@ const MOCK_REPORTS: CommunityReport[] = [
   { id:"m5", resourceName:"Queens Fresh Table", imageUrl:FALLBACK_IMAGES[5], caption:"Great selection this week — lots of veggies and some meat packages too.", createdAt:"2 days ago", displayName:"Sofia R.", anonymous:false, avatarSeed:"foxtrot" },
 ];
 
+
 // ─── Badge SVGs ───────────────────────────────────────────────────────────────
+
 
 const BADGES = [
   {
@@ -299,10 +310,13 @@ const BADGES = [
   },
 ];
 
+
 // ─── Avatar ───────────────────────────────────────────────────────────────────
+
 
 const AVATAR_COLORS = ["#f97316","#10b981","#6366f1","#ec4899","#14b8a6","#f59e0b","#8b5cf6"];
 function hashSeed(s: string) { let h=0; for (const c of s) h=(h*31+c.charCodeAt(0))>>>0; return h; }
+
 
 function Avatar({ seed, size=8 }: { seed: string; size?: number }) {
   const col = AVATAR_COLORS[hashSeed(seed) % AVATAR_COLORS.length];
@@ -314,7 +328,9 @@ function Avatar({ seed, size=8 }: { seed: string; size?: number }) {
   );
 }
 
+
 // ─── BadgeStrip ───────────────────────────────────────────────────────────────
+
 
 function BadgeStrip({ count }: { count: number }) {
   const next = BADGES.find(b => b.threshold > count);
@@ -363,13 +379,16 @@ function BadgeStrip({ count }: { count: number }) {
   );
 }
 
+
 // ─── ReportCard ───────────────────────────────────────────────────────────────
+
 
 const STOCK_PILL: Record<string, string> = {
   high:   "bg-green-100 text-green-700",
   medium: "bg-amber-100 text-amber-700",
   low:    "bg-red-100   text-red-700",
 };
+
 
 function ReportCard({ report }: { report: CommunityReport }) {
   const [hovered, setHovered] = useState(false);
@@ -409,7 +428,9 @@ function ReportCard({ report }: { report: CommunityReport }) {
   );
 }
 
+
 // ─── ReportFeed ───────────────────────────────────────────────────────────────
+
 
 function ReportFeed({ reports }: { reports: CommunityReport[] }) {
   return (
@@ -423,7 +444,9 @@ function ReportFeed({ reports }: { reports: CommunityReport[] }) {
   );
 }
 
+
 // ─── UploadModal ──────────────────────────────────────────────────────────────
+
 
 const REPORT_QUESTIONS = [
   { key: "freshProduce",  label: "Fresh Fruit / Produce", icon: "🥬" },
@@ -438,6 +461,7 @@ const REPORT_QUESTIONS = [
 type QuestionKey = typeof REPORT_QUESTIONS[number]["key"];
 type Answers = Record<QuestionKey, boolean | null>;
 
+
 function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (data: any) => void }) {
   const [caption, setCaption] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -450,6 +474,7 @@ function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (da
     freshProduce: null, halal: null, kosher: null, cannedGoods: null,
     dairy: null, frozen: null, bread: null, largeVariety: null,
   });
+
 
   const handleFileChange = async (f: File) => {
     setImgPreview(URL.createObjectURL(f));
@@ -479,16 +504,21 @@ function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (da
     }
   };
 
+
   const toggle = (key: QuestionKey, val: boolean) =>
     setAnswers(prev => ({ ...prev, [key]: prev[key] === val ? null : val }));
 
+
   const activeTags = REPORT_QUESTIONS.filter(q => answers[q.key] === true).map(q => q.label);
 
+
   const AI_PREFILLED: QuestionKey[] = ["freshProduce", "cannedGoods", "dairy", "frozen", "bread"];
+
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+
 
         {/* Header */}
         <div className="flex justify-between items-center p-6 pb-4 border-b border-gray-100 sticky top-0 bg-white z-10">
@@ -500,7 +530,9 @@ function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (da
             className="text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-xl leading-none">✕</button>
         </div>
 
+
         <div className="p-6 space-y-6">
+
 
           {/* Photo upload + AI analysis */}
           <div>
@@ -539,6 +571,7 @@ function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (da
               )}
             </label>
 
+
             {/* AI result summary bar */}
             {aiResult && !analyzing && (
               <div className="mt-3 bg-purple-50 border border-purple-100 rounded-xl px-4 py-3 space-y-2">
@@ -573,6 +606,7 @@ function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (da
               <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-100 px-3 py-2 rounded-lg">{aiError}</p>
             )}
           </div>
+
 
           {/* Yes/No checklist */}
           <div>
@@ -609,6 +643,7 @@ function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (da
             </div>
           </div>
 
+
           {/* Caption */}
           <div>
             <p className="text-sm font-semibold text-gray-800 mb-2">Add a note <span className="font-normal text-gray-400">(optional)</span></p>
@@ -616,6 +651,7 @@ function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (da
               placeholder="e.g. Busy today but volunteers were helpful. Lots of produce!"
               className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm resize-none outline-none focus:ring-2 focus:ring-purple-300 text-gray-900" />
           </div>
+
 
           {/* Anonymous toggle */}
           <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
@@ -631,11 +667,13 @@ function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (da
             </button>
           </div>
 
+
           {!anon && (
             <input value={displayName} onChange={e => setDisplayName(e.target.value)}
               placeholder="Display name (optional)"
               className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-purple-300 text-gray-900" />
           )}
+
 
           {/* Submit */}
           <button
@@ -653,7 +691,9 @@ function UploadModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (da
   );
 }
 
+
 // ─── Analyst-only sub-components ─────────────────────────────────────────────
+
 
 function FeedbackCard({ fb }: { fb: FeedbackItem }) {
   return (
@@ -673,6 +713,7 @@ function FeedbackCard({ fb }: { fb: FeedbackItem }) {
   );
 }
 
+
 function AlertCard({ alert }: { alert: Alert }) {
   const isHigh = alert.severity === "high";
   return (
@@ -691,20 +732,17 @@ function AlertCard({ alert }: { alert: Alert }) {
   );
 }
 
-const getBarColor = (range: string) => {
-  const start = parseInt(range.split("-")[0], 10);
-  if (start < 40) return "#EF5350";
-  if (start < 60) return "#FFA726";
-  return "#2E7D32";
-};
+
 
 // ─── Client-view sub-components ──────────────────────────────────────────────
+
 
 const TYPE_LABELS: Record<string, string> = {
   FOOD_PANTRY: "Food Pantry",
   SOUP_KITCHEN: "Soup Kitchen",
   COMMUNITY_FRIDGE: "Community Fridge",
 };
+
 
 function StarRating({ value }: { value: number }) {
   return (
@@ -716,6 +754,7 @@ function StarRating({ value }: { value: number }) {
     </div>
   );
 }
+
 
 function ResourceCard({ r }: { r: Resource }) {
   const badgeColors: Record<string, string> = {
@@ -771,6 +810,7 @@ function ResourceCard({ r }: { r: Resource }) {
   );
 }
 
+
 function timeAgo(ts: string) {
   const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
   if (diff < 60) return `${diff}m ago`;
@@ -778,10 +818,12 @@ function timeAgo(ts: string) {
   return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+
 function ReviewForm({ onSubmitted }: { onSubmitted: () => void }) {
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -802,6 +844,7 @@ function ReviewForm({ onSubmitted }: { onSubmitted: () => void }) {
     }
   };
 
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <textarea value={text} onChange={e => setText(e.target.value)}
@@ -816,6 +859,7 @@ function ReviewForm({ onSubmitted }: { onSubmitted: () => void }) {
     </form>
   );
 }
+
 
 function RecentReviews({ feedback }: { feedback: FeedbackItem[] }) {
   if (feedback.length === 0) return (
@@ -846,11 +890,14 @@ function RecentReviews({ feedback }: { feedback: FeedbackItem[] }) {
   );
 }
 
+
 // ─── Main Component ───────────────────────────────────────────────────────────
+
 
 export function CommunityHubPage() {
   const { role } = useApp();
   const isClient = role === "client";
+
 
   // Shared state
   const [loading, setLoading] = useState(true);
@@ -859,33 +906,37 @@ export function CommunityHubPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [userCount, setUserCount] = useState(13);
 
+
   // Analyst-only state
   const [activeTab, setActiveTab] = useState<ActiveTab>("reports");
-  const [reliability, setReliability] = useState<ReliabilitySummary | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [timeFilter, setTimeFilter] = useState("all");
   const [selectedDate, setSelectedDate] = useState("");
 
+
   // Client-only state
   const [resources, setResources] = useState<Resource[]>([]);
+
 
   const loadFeedback = () =>
     fetch("/api/analyze-feedback").then(r => r.json()).then(d => setFeedback(d.feedback || []));
 
+
   useEffect(() => {
     setLoading(true);
+
 
     const promises: Promise<any>[] = [
       fetch("/api/map-data").then(r => r.json()),
       fetch("/api/analyze-feedback").then(r => r.json()),
       ...(!isClient ? [
-        fetch("/api/reliability").then(r => r.json()),
         fetch("/api/alerts").then(r => r.json()),
       ] : []),
     ];
 
+
     Promise.all(promises)
-      .then(([mapData, fbData, relData, alData]) => {
+      .then(([mapData, fbData, alData]) => {
         // Build report feed: mix API images with fallbacks
         const listResources: any[] = mapData.listResources || mapData.pantries || [];
         const named = listResources.filter((r: any) => r.name).slice(0, 10);
@@ -900,22 +951,26 @@ export function CommunityHubPage() {
           avatarSeed: r.id.slice(0, 6),
         }));
 
+
         // Always mix API reports with the mock reports for a full feed
         setReports([...apiReports, ...MOCK_REPORTS]);
 
+
         setFeedback(fbData?.feedback || []);
+
 
         if (isClient) {
           setResources(named.slice(0, 8) as Resource[]);
         } else {
-          setReliability(relData?.summary || null);
           setAlerts(alData?.alerts || []);
         }
+
 
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [isClient]);
+
 
   const filteredFeedback = useMemo(() => {
     if (timeFilter === "all") return feedback;
@@ -923,6 +978,7 @@ export function CommunityHubPage() {
       return feedback.filter(f => f.createdAt.includes(selectedDate));
     return feedback;
   }, [feedback, timeFilter, selectedDate]);
+
 
   function handleReportSubmit({ caption, displayName, anon, imgPreview, tags, aiResult }: any) {
     const autoCaption = aiResult
@@ -943,11 +999,14 @@ export function CommunityHubPage() {
     setUserCount(c => c + 1);
   }
 
+
   // ── Client layout ────────────────────────────────────────────────────────────
+
 
   if (isClient) {
     return (
       <div className="max-w-5xl mx-auto space-y-8">
+
 
         {/* Welcome banner */}
         <div className="bg-[#FFCC10] rounded-2xl px-8 py-6 flex items-center gap-4">
@@ -964,6 +1023,7 @@ export function CommunityHubPage() {
             Add Report
           </button>
         </div>
+
 
         {/* AI feature highlight */}
         <div className="bg-gradient-to-r from-purple-50 to-purple-100/50 border border-purple-100 rounded-2xl px-6 py-5">
@@ -998,12 +1058,14 @@ export function CommunityHubPage() {
           </div>
         </div>
 
+
         {/* Badges + report feed */}
         <section>
           <BadgeStrip count={userCount} />
           <h2 className="font-semibold text-gray-900 mb-3 text-base">Community Reports</h2>
           <ReportFeed reports={reports} />
         </section>
+
 
         {/* Top recommended resources */}
         <section>
@@ -1022,6 +1084,7 @@ export function CommunityHubPage() {
           )}
         </section>
 
+
         {/* Write a Review — full width */}
         <section>
           <div className="flex items-center gap-2 mb-4">
@@ -1037,12 +1100,15 @@ export function CommunityHubPage() {
           </div>
         </section>
 
+
         {modalOpen && <UploadModal onClose={() => setModalOpen(false)} onSubmit={handleReportSubmit} />}
       </div>
     );
   }
 
+
   // ── Analyst layout ───────────────────────────────────────────────────────────
+
 
   return (
     <div className="space-y-6">
@@ -1060,12 +1126,12 @@ export function CommunityHubPage() {
         )}
       </header>
 
+
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
         {[
           { id: "reports",          label: "Citizen Reports",    icon: MessageSquareIcon },
           { id: "feedback_history", label: "Feedback History",   icon: Calendar },
-          { id: "reliability",      label: "Reliability Scores", icon: Star },
           { id: "alerts",           label: "Operational Alerts", icon: AlertTriangle },
         ].map((t) => (
           <button key={t.id} onClick={() => setActiveTab(t.id as ActiveTab)}
@@ -1081,6 +1147,7 @@ export function CommunityHubPage() {
         ))}
       </div>
 
+
       {/* Reports tab */}
       {activeTab === "reports" && (
         <div className="space-y-5">
@@ -1088,6 +1155,7 @@ export function CommunityHubPage() {
           <ReportFeed reports={reports} />
         </div>
       )}
+
 
       {/* Feedback History tab */}
       {activeTab === "feedback_history" && (
@@ -1115,41 +1183,6 @@ export function CommunityHubPage() {
         </div>
       )}
 
-      {/* Reliability tab */}
-      {activeTab === "reliability" && reliability && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-4 gap-6">
-            {[
-              { label:"Excellent", val:reliability.excellent, cls:"text-green-600" },
-              { label:"Good",      val:reliability.good,      cls:"text-yellow-500" },
-              { label:"At Risk",   val:reliability.atRisk,    cls:"text-red-500" },
-              { label:"Avg Score", val:reliability.avgScore,  cls:"text-gray-900" },
-            ].map(({ label, val, cls }) => (
-              <div key={label} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                <p className="text-gray-400 text-xs font-bold uppercase mb-1">{label}</p>
-                <p className={`text-3xl font-black ${cls}`}>{val}</p>
-              </div>
-            ))}
-          </div>
-          <section className="bg-white rounded-2xl border border-gray-200 p-6">
-            <h3 className="font-bold mb-6 text-gray-900">Reliability Score Distribution</h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={reliability.histogram}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                  <XAxis dataKey="range" axisLine={false} tickLine={false} tick={{ fontSize:10 }} />
-                  <YAxis hide />
-                  <Tooltip cursor={{ fill:"#f9f9f9" }} contentStyle={{ borderRadius:"12px", border:"none", boxShadow:"0 10px 15px -3px rgba(0,0,0,0.1)" }} />
-                  <Bar dataKey="count" radius={[6,6,0,0]}>
-                    {reliability.histogram.map((entry, i) => <Cell key={i} fill={getBarColor(entry.range)} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </section>
-        </div>
-      )}
-
       {/* Alerts tab */}
       {activeTab === "alerts" && (
         <div className="max-w-3xl space-y-4">
@@ -1163,7 +1196,12 @@ export function CommunityHubPage() {
         </div>
       )}
 
+
       {modalOpen && <UploadModal onClose={() => setModalOpen(false)} onSubmit={handleReportSubmit} />}
     </div>
   );
 }
+
+
+
+
