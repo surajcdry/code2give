@@ -59,7 +59,7 @@ export function ChatBot() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-9999">
+    <div className="fixed bottom-6 right-6 z-[9999]">
       {isOpen && (
         <div className="absolute bottom-16 right-0 w-80 h-96 bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden">
           <div className="bg-[#FFCC10] p-4 flex justify-between items-center">
