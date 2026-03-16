@@ -69,6 +69,25 @@ ${boroughs.slice(0, 5).map((b: { borough: string; resourceCount: number }) => `-
       `.trim();
     }
 
+    const boroughNames = ["Bronx", "Brooklyn", "Manhattan", "Queens", "Staten Island"];
+    const atRiskByBorough = boroughNames.map(borough => {
+      const pantries = (reliability?.resources ?? [])
+        .filter((r: { badge: string; city: string | null; waitTime: number | null }) =>
+          r.badge === "At Risk" &&
+          r.waitTime != null &&
+          r.waitTime > 0 &&
+          r.city != null
+        )
+        .filter((r: { city: string }) =>
+          borough === "Manhattan"
+            ? r.city.toLowerCase().includes("new york") || r.city.toLowerCase().includes("manhattan")
+            : r.city.toLowerCase().includes(borough.toLowerCase())
+        )
+        .sort((a: { waitTime: number }, b: { waitTime: number }) => b.waitTime - a.waitTime)
+        .slice(0, 3);
+      return { borough, pantries };
+    }).filter(b => b.pantries.length > 0);
+
     return `
 RELIABILITY OVERVIEW:
 - Excellent pantries: ${summary?.excellent ?? "N/A"}
@@ -78,6 +97,11 @@ RELIABILITY OVERVIEW:
 
 BOROUGH BREAKDOWN:
 ${boroughs.slice(0, 5).map((b: { borough: string; avgRating: number; resourceCount: number }) => `- ${b.borough}: ${b.resourceCount} pantries, avg rating ${b.avgRating?.toFixed(2) ?? "N/A"}`).join("\n")}
+
+AT-RISK PANTRIES BY BOROUGH NEEDING SUPPORT:
+${atRiskByBorough.map(b =>
+      `${b.borough}:\n${b.pantries.map((r: { name: string; waitTime: number }) => `  - ${r.name} — ${Math.round(r.waitTime)} min avg wait`).join("\n")}`
+    ).join("\n")}
 
 ${isPrivileged ? `RESOURCE TYPE BREAKDOWN:\n${topIssues.slice(0, 5).map((t: { type: string; count: number }) => `- ${t.type}: ${t.count} locations`).join("\n")}` : ""}
     `.trim();
