@@ -2,7 +2,7 @@
 
 **Morgan Stanley Code to Give Hackathon — Track B, Team 9**
 
-A full-stack, multi-stakeholder data intelligence platform that transforms raw food access data into actionable decisions. Built for [Lemontree](https://www.lemontree.org), the platform helps nonprofits, donors, government agencies, and community members understand not just *where* food resources exist, but *why* people struggle to access them — and what to do about it.
+A full-stack, multi-stakeholder data intelligence platform that transforms raw food access data into actionable decisions. Built for [Lemontree](https://www.foodhelpline.org), the platform helps nonprofits, donors, government agencies, and community members understand not just *where* food resources exist, but *why* people struggle to access them — and what to do about it.
 
 ---
 
@@ -49,7 +49,7 @@ The system combines:
 - Community feedback processed by Google Gemini for sentiment and category tagging
 - Pantry photos analyzed by Groq vision AI for stock and crowd levels
 - US Census poverty data layered onto the map
-- A Graph Neural Network (GNN) that scores each pantry's coverage gap probability and assigns an archetype
+- A Graph Neural Network (GNN) that scores each pantry's coverage gap probability and assigns a Resource Profile (archetype)
 
 ---
 
@@ -90,15 +90,15 @@ Real consequences:
 ```
 Browser (Next.js App Router)
 │
-├── AppLayout.tsx          Role selection, sidebar, header, chat widget
+├── AppLayout.tsx             Role selection, sidebar, header, chat widget
 │
 ├── Pages (per role)
-│   ├── OverviewPage       KPI cards + role-specific charts
-│   ├── FoodResourceMapPage  Interactive map, filters, layers, detail panel
-│   ├── AnalyticsPage      Reliability histogram, borough charts, export
-│   ├── DataTablePage      Paginated table of resources + feedback
+│   ├── OverviewPage          KPI cards + role-specific charts
+│   ├── FoodResourceMapPage   Interactive map, filters, layers, detail panel
+│   ├── AnalyticsPage         Reliability histogram, borough charts, export
+│   ├── DataTablePage         Paginated table of resources + feedback
 │   ├── CommunityReportsPage  Reports feed, feedback history, alerts
-│   └── SettingsPage       Placeholder
+│   └── SettingsPage          User settings
 │
 ├── /api/* (Next.js Route Handlers)
 │   ├── Compute-heavy routes cached in-memory (5-minute TTL)
@@ -163,11 +163,9 @@ Full-screen Google Maps integration with real-time viewport-based data fetching.
 
 | Layer | What it shows |
 |---|---|
-| **Service Gap** | Choropleth of underserved areas by GNN gap score |
-| **Archetype** | Color-coded resource profile per pantry |
-| **Tract Centroids** | Census tract overlays with poverty indices |
-| **Zip Code Stats** | Per-zip aggregated ratings, wait times, and counts |
-| **Poverty (SNAP Need)** | GeoJSON from US Census ACS5 data |
+| Service Gap | ZIP-level choropleth based on percent unavailable resources from Lemontree Resources API |
+| Equity Gap | Heatmap of poverty intensity by tract from 2022 US Census data |
+| Resource Profile | GNN-based community need clusters for each resource (archetype layer) |
 
 **Right panel (collapsible):**
 - Full detail card for selected resource: hours, website, phone, directions link
@@ -250,6 +248,7 @@ Data visualization dashboard with PDF export capability.
 - **Borough Ratings:** Bar chart of average ratings per NYC borough, Y-axis capped at 5
 - **Resource Mix:** Donut chart — pantry (yellow), soup kitchen (black), fridge (green)
 - **Wait Time vs Rating Table:** Searchable grid (debounced 300ms search), shows first 5 rows unless searching
+- Note that these visualizations are not limited to just NYC data
 
 **PDF Export:**
 - Captures the full analytics section via `html2canvas` (converts to grayscale PNG)
@@ -391,7 +390,7 @@ The GNN detects **food access coverage gaps** — neighborhoods where poverty is
 ```
 seed_census.py         → Pull US Census ACS5 2022 data → populate CensusData table
 enrich_resources.py    → Geocode resources, assign census tractId to each Resource
-build_features.py      → Engineer 11 features per resource, build spatial graph (2km edges)
+build_features.py      → Engineer 10 features per resource, build spatial graph (2km edges)
 train_gnn.py           → Train GraphSAGE model (80/20 stratified split)
 write_scores.py        → Write gnnScore (critical gap probability 0–1) to Resource table
 cluster_archetypes.py  → K-means on 32-dim embeddings → assign archetype names
@@ -401,7 +400,7 @@ cluster_archetypes.py  → K-means on 32-dim embeddings → assign archetype nam
 
 ### Feature Engineering
 
-**`build_features.py`** extracts 11 features per resource and constructs a spatial graph:
+**`build_features.py`** extracts 10 features per resource and constructs a spatial graph:
 
 | # | Feature | Description |
 |---|---|---|
@@ -415,21 +414,20 @@ cluster_archetypes.py  → K-means on 32-dim embeddings → assign archetype nam
 | 8 | `review_normalized` | log1p(reviews) / log1p(max reviews) |
 | 9 | `confidence` | Lemontree data quality score (0–1) |
 | 10 | `appointment_required` | Boolean → 0 / 1 |
-| 11 | `neighbor_count_normalized` | log1p(spatial neighbors within 2km) / log1p(max) |
 
 **Graph construction:**
-- BallTree with haversine metric, 2km radius
+- BallTree with haversine metric, 2km radius (nodes within 2km of each other are connected)
 - Edge weights: `1.0 / (distance_km + 0.01)` (inverse distance)
 - Self-loops removed, bidirectional edges deduplicated
 
 **Coverage gap label:**
 ```python
 gap_score = poverty_index / (1 + neighbor_count_within_2km)
-
-Class 0 (well-covered):   gap_score ≤ 50th percentile  (~50% of nodes)
-Class 1 (moderate gap):   50th < gap_score ≤ 85th      (~35% of nodes)
-Class 2 (critical gap):   gap_score > 85th percentile  (~15% of nodes)
 ```
+- Class 0 (well-covered):   gap_score ≤ 50th percentile  (~50% of nodes)
+- Class 1 (moderate gap):   50th < gap_score ≤ 85th      (~35% of nodes)
+- Class 2 (critical gap):   gap_score > 85th percentile  (~15% of nodes)
+
 
 ---
 
@@ -438,9 +436,9 @@ Class 2 (critical gap):   gap_score > 85th percentile  (~15% of nodes)
 **Model: GraphSAGEWithEmbeddings**
 
 ```
-Input: 11 node features
+Input: 10 node features
     ↓
-SAGEConv(11 → 64) + ReLU + Dropout(0.3)
+SAGEConv(10 → 64) + ReLU + Dropout(0.3)
     ↓
 SAGEConv(64 → 32) + ReLU
     ↓
@@ -452,9 +450,9 @@ Linear(32 → 3)
 ```
 
 **Message passing (SAGEConv):**
-```
-h_v_new = W × CONCAT(h_v, MEAN({h_u : u ∈ neighbors(v)}))
-```
+
+$$h_{v_{new}} = W \cdot CONCAT(h_v, MEAN({h_u : u \in neighbors(v)}))$$
+
 Layer 1 aggregates 1-hop neighbors; Layer 2 aggregates 2-hop neighbors.
 
 **Training configuration:**
@@ -484,11 +482,11 @@ Layer 1 aggregates 1-hop neighbors; Layer 2 aggregates 2-hop neighbors.
 
 **Naming decision tree:**
 ```
-gap ≥ p75 AND density < 0.25       → Critical Desert
-gap ≥ p75 AND density ≥ 0.25       → Stressed Hub
-gap ≥ p50                          → Fragile Sole Provider / Low-Need Isolated
-gap < p50 AND density ≥ 0.40 AND poverty ≥ median  → Urban Core Cluster
-otherwise                          → Well-Served Suburban
+gap ≥ p75 AND density < 0.25                       → Critical Desert
+gap ≥ p75 AND density ≥ 0.25                       → Stressed Hub
+gap ≥ p50                                          → Quietly Underserved / Low-Need Isolated
+gap < p50 AND density ≥ 0.40 AND poverty ≥ median  → Dense & Covered / Urban Core Cluster
+otherwise                                          → Stable & Covered / Well-Served Suburban
 ```
 
 ---
@@ -661,7 +659,7 @@ The chatbot `/api/chat` also filters what dashboard context is exposed per role 
 │   │   │   ├── AnalyticsPage.tsx       # Charts + PDF export
 │   │   │   ├── DataTablePage.tsx       # Paginated resources + feedback table
 │   │   │   ├── CommunityReportsPage.tsx # Reports feed + alerts
-│   │   │   └── SettingsPage.tsx        # Placeholder
+│   │   │   └── SettingsPage.tsx        # User settings
 │   │   ├── /layout
 │   │   │   └── AppLayout.tsx           # Sidebar, header, role switcher, chat widget
 │   │   ├── /providers
@@ -796,6 +794,12 @@ If `GEMINI_API_KEY` is not set, the feedback classifier falls back to keyword-ba
 
 ---
 
+## Deployment
+
+This project is deployed and live on Vercel: [Lemonaid live site](https://lemonaid-nine.vercel.app/).
+
+---
+
 ## Acknowledgements
 
-Built for the **Morgan Stanley Code to Give Hackathon** in partnership with [Lemontree](https://www.lemontree.org), a nonprofit dedicated to connecting communities with local food resources across New York City.
+Built for the **Morgan Stanley Code to Give Hackathon** in partnership with [Lemontree](https://www.foodhelpline.org/), a nonprofit dedicated to connecting communities with local food resources across New York City.

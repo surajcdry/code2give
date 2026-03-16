@@ -63,7 +63,7 @@ export function ChatBot() {
       {isOpen && (
         <div className="absolute bottom-16 right-0 w-80 h-96 bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden">
           <div className="bg-[#FFCC10] p-4 flex justify-between items-center">
-            <span className="font-bold text-gray-900">LemonAid Agent</span>
+            <span className="font-bold text-gray-900">LemonAid Assistant</span>
             <button onClick={() => setIsOpen(false)}><X size={18} /></button>
           </div>
           <div className="flex-1 p-4 bg-gray-50 overflow-y-auto text-sm text-gray-600 space-y-2">
