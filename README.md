@@ -1,4 +1,4 @@
-# Lemontree InsightEngine
+# LemonAid: Lemontree InsightEngine
 
 **Morgan Stanley Code to Give Hackathon — Track B, Team 9**
 
